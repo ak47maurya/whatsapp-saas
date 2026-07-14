@@ -1,0 +1,143 @@
+<%- include('../partials/header') %>
+<%- include('../partials/sidebar') %>
+<div class="main-content">
+  <%- include('../partials/navbar') %>
+  <div class="content p-7 m-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="mb-0">Campaigns</h4>
+      <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#campaignModal"><i class="fas fa-plus"></i> New Campaign</button>
+    </div>
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <table class="table table-hover datatable">
+          <thead><tr><th>Name</th><th>Status</th><th>Contacts</th><th>Sent/Failed</th><th>Progress</th><th>Created</th><th>Actions</th></tr></thead>
+          <tbody>
+            <% (campaigns || []).forEach(c => { %>
+              <tr>
+                <td><%= c.name %></td>
+                <td><span class="badge bg-<%= c.status === 'running' ? 'success' : c.status === 'paused' ? 'warning' : c.status === 'completed' ? 'info' : c.status === 'failed' ? 'danger' : 'secondary' %>"><%= c.status %></span></td>
+                <td><%= c.totalContacts %></td>
+                <td><%= c.sentCount %>/<%= c.failedCount %></td>
+                <td>
+                  <div class="progress" style="height:6px">
+                    <div class="progress-bar bg-success" style="width:<%= c.totalContacts ? (c.sentCount/c.totalContacts)*100 : 0 %>%"></div>
+                    <div class="progress-bar bg-danger" style="width:<%= c.totalContacts ? (c.failedCount/c.totalContacts)*100 : 0 %>%"></div>
+                  </div>
+                </td>
+                <td><%= new Date(c.createdAt).toLocaleDateString() %></td>
+                <td>
+                  <% if (c.status === 'draft' || c.status === 'scheduled') { %>
+                    <button onclick="startCampaign('<%= c._id %>')" class="btn btn-sm btn-success"><i class="fas fa-play"></i></button>
+                  <% } %>
+                  <% if (c.status === 'running') { %>
+                    <button onclick="pauseCampaign('<%= c._id %>')" class="btn btn-sm btn-warning"><i class="fas fa-pause"></i></button>
+                    <button onclick="stopCampaign('<%= c._id %>')" class="btn btn-sm btn-danger"><i class="fas fa-stop"></i></button>
+                  <% } %>
+                  <% if (c.status === 'paused') { %>
+                    <button onclick="resumeCampaign('<%= c._id %>')" class="btn btn-sm btn-success"><i class="fas fa-play"></i></button>
+                  <% } %>
+                  <button onclick="deleteCampaign('<%= c._id %>')" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+                  <button onclick="viewAnalytics('<%= c._id %>')" class="btn btn-sm btn-outline-info"><i class="fas fa-chart-bar"></i></button>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <%- include('../partials/footer') %>
+</div>
+
+<div class="modal fade" id="campaignModal"><div class="modal-dialog modal-lg"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title">New Campaign</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <form id="campaignForm" method="POST" action="/campaigns?_csrf=<%= csrfToken %>" enctype="multipart/form-data">
+    <div class="modal-body">
+      <div class="mb-3"><label class="form-label">Campaign Name</label><input type="text" name="name" class="form-control" required></div>
+      <div class="mb-3"><label class="form-label">Description</label><textarea name="description" class="form-control" rows="2"></textarea></div>
+      <div class="row mb-3">
+        <div class="col"><label class="form-label">Instance</label>
+          <select name="instanceId" class="form-select" required>
+            <% (instances || []).forEach(i => { %><option value="<%= i._id %>"><%= i.name %></option><% }) %>
+          </select>
+        </div>
+        <div class="col"><label class="form-label">Type</label><select name="type" class="form-select" onchange="toggleCampType()"><option value="text">Text</option><option value="image">Image</option><option value="video">Video</option><option value="audio">Audio</option><option value="document">Document</option><option value="sticker">Sticker</option></select></div>
+      </div>
+      <div class="mb-3" id="campTextGroup"><label class="form-label">Message Text</label><textarea name="text" class="form-control" rows="3"></textarea></div>
+      <div class="mb-3" id="campMediaGroup" style="display:none">
+        <div class="mb-2"><label class="form-label">Media File</label><input type="file" name="mediaFile" class="form-control" accept="image/*,video/*,audio/*,.pdf,.doc,.docx"></div>
+        <div class="mb-2"><label class="form-label">Or Media URL</label><input type="url" name="mediaUrl" class="form-control" placeholder="https://example.com/image.jpg"></div>
+        <div class="mb-2"><label class="form-label">Caption (for image/video)</label><textarea name="caption" class="form-control" rows="2"></textarea></div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label d-flex align-items-center gap-2">
+          <span>Recipients</span>
+          <div class="btn-group btn-group-sm" role="group">
+            <button type="button" class="btn btn-outline-secondary active" id="campFileTab" onclick="campRecipTab('file')">CSV/Excel</button>
+            <button type="button" class="btn btn-outline-secondary" id="campManualTab" onclick="campRecipTab('manual')">Manual</button>
+          </div>
+        </label>
+        <div id="campFileSection">
+          <input type="file" name="file" class="form-control" accept=".csv,.xlsx,.xls">
+          <div class="form-text">CSV or Excel with <code>phone</code> column.</div>
+        </div>
+        <div id="campManualSection" style="display:none">
+          <textarea name="manualRecipients" class="form-control" rows="4" placeholder="91876543210&#10;91987654321&#10;91876543219"></textarea>
+          <div class="form-text">One phone number per line.</div>
+        </div>
+      </div>
+
+      <div class="row mb-3">
+        <div class="col-4">
+          <label class="form-label">Delay Type</label>
+          <select name="delayType" class="form-select" onchange="toggleCampDelay()">
+            <option value="fixed">Fixed</option>
+            <option value="random">Random</option>
+          </select>
+        </div>
+        <div class="col-4" id="campFixedDelayGroup">
+          <label class="form-label">Delay (ms)</label>
+          <input type="number" name="fixedDelay" class="form-control" value="2000" min="500" step="500">
+        </div>
+        <div class="col-4" id="campRandomDelayGroup" style="display:none">
+          <label class="form-label">Min – Max (ms)</label>
+          <div class="input-group">
+            <input type="number" name="minDelay" class="form-control" value="1000" min="500" step="500" placeholder="Min">
+            <input type="number" name="maxDelay" class="form-control" value="5000" min="1000" step="500" placeholder="Max">
+          </div>
+        </div>
+      </div>
+
+      <div class="mb-3"><label class="form-label">Schedule (optional)</label><input type="datetime-local" name="scheduledAt" class="form-control"></div>
+    </div>
+    <div class="modal-footer"><button type="submit" class="btn btn-success">Create Campaign</button></div>
+  </form>
+</div></div></div>
+<script>
+function toggleCampType() {
+  const t = document.querySelector('[name=type]').value;
+  document.getElementById('campTextGroup').style.display = t === 'text' ? 'block' : 'none';
+  document.getElementById('campMediaGroup').style.display = t === 'text' ? 'none' : 'block';
+}
+function toggleCampDelay() {
+  const t = document.querySelector('[name=delayType]').value;
+  document.getElementById('campFixedDelayGroup').style.display = t === 'fixed' ? 'block' : 'none';
+  document.getElementById('campRandomDelayGroup').style.display = t === 'random' ? 'block' : 'none';
+}
+function campRecipTab(tab) {
+  document.getElementById('campFileSection').style.display = tab === 'file' ? 'block' : 'none';
+  document.getElementById('campManualSection').style.display = tab === 'manual' ? 'block' : 'none';
+  document.getElementById('campFileTab').classList.toggle('active', tab === 'file');
+  document.getElementById('campManualTab').classList.toggle('active', tab === 'manual');
+}
+</script>
+
+<script>
+function startCampaign(id) { api('/campaigns/'+id+'/start', {method:'POST'}).then(r=>r.json()).then(d=>{if(d.success)location.reload();else Swal.fire('Error',d.message,'error');}); }
+function pauseCampaign(id) { api('/campaigns/'+id+'/pause', {method:'POST'}).then(r=>r.json()).then(d=>{if(d.success)location.reload();else Swal.fire('Error',d.message,'error');}); }
+function resumeCampaign(id) { api('/campaigns/'+id+'/resume', {method:'POST'}).then(r=>r.json()).then(d=>{if(d.success)location.reload();else Swal.fire('Error',d.message,'error');}); }
+function stopCampaign(id) { api('/campaigns/'+id+'/stop', {method:'POST'}).then(r=>r.json()).then(d=>{if(d.success)location.reload();else Swal.fire('Error',d.message,'error');}); }
+function deleteCampaign(id) { Swal.fire({title:'Delete?',icon:'warning',showCancelButton:true}).then(r=>{if(r.isConfirmed)api('/campaigns/'+id,{method:'DELETE'}).then(r=>r.json()).then(d=>{if(d.success)location.reload();else Swal.fire('Error',d.message,'error');});}); }
+function viewAnalytics(id) { window.location.href='/campaigns/'+id+'/analytics'; }
+</script>

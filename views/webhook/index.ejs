@@ -1,0 +1,68 @@
+<%- include('../partials/header') %>
+<%- include('../partials/sidebar') %>
+<div class="main-content">
+  <%- include('../partials/navbar') %>
+  <div class="content p-7 m-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="mb-0">Webhooks</h4>
+      <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#webhookModal"><i class="fas fa-plus"></i> Add Webhook</button>
+    </div>
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <table class="table datatable">
+          <thead><tr><th>Name</th><th>URL</th><th>Events</th><th>Status</th><th>Last Triggered</th><th>Actions</th></tr></thead>
+          <tbody>
+            <% (webhooks || []).forEach(w => { %>
+              <tr>
+                <td><%= w.name %></td>
+                <td class="text-truncate" style="max-width:200px"><%= w.url %></td>
+                <td><% (w.events || []).slice(0,2).forEach(e => { %><span class="badge bg-info me-1"><%= e %></span><% }) %><% if(w.events?.length > 2) { %><span class="badge bg-secondary">+<%= w.events.length-2 %></span><% } %></td>
+                <td><span class="badge bg-<%= w.isActive ? 'success' : 'secondary' %>"><%= w.isActive ? 'Active' : 'Inactive' %></span></td>
+                <td>
+                  <%= w.lastTriggered ? new Date(w.lastTriggered).toLocaleString() : 'Never' %>
+                  <% if (w.lastResponse) { %>
+                    <br><small class="text-<%= w.lastResponse.statusCode >= 200 && w.lastResponse.statusCode < 300 ? 'success' : 'danger' %>">HTTP <%= w.lastResponse.statusCode %></small>
+                  <% } %>
+                </td>
+                <td>
+                  <button onclick="toggleWebhook('<%= w._id %>')" class="btn btn-sm btn-<%= w.isActive ? 'warning' : 'success' %>"><i class="fas fa-<%= w.isActive ? 'pause' : 'play' %>"></i></button>
+                  <button onclick="testWebhook(event, '<%= w._id %>')" class="btn btn-sm btn-info"><i class="fas fa-flask"></i></button>
+                  <button onclick="deleteWebhook('<%= w._id %>')" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <%- include('../partials/footer') %>
+</div>
+
+<div class="modal fade" id="webhookModal"><div class="modal-dialog"><div class="modal-content">
+  <div class="modal-header"><h5>Add Webhook</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+  <form method="POST" action="/webhooks">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="modal-body">
+      <div class="mb-3"><label class="form-label">Name</label><input type="text" name="name" class="form-control" required></div>
+      <div class="mb-3"><label class="form-label">URL</label><input type="url" name="url" class="form-control" required placeholder="https://example.com/webhook"></div>
+      <div class="mb-3"><label class="form-label">Instance (optional)</label><select name="instanceId" class="form-select"><option value="">All Instances</option><% (instances || []).forEach(i => { %><option value="<%= i._id %>"><%= i.name %><%= i.phone ? ' ('+i.phone+')' : '' %></option><% }) %></select></div>
+      <div class="mb-3"><label class="form-label">Events</label><div class="row"><% ['message.received','message.sent','message.delivered','instance.connected','instance.disconnected','group.update'].forEach(e => { %><div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" name="events" value="<%= e %>"><label class="form-check-label"><%= e %></label></div></div><% }) %></div></div>
+      <div class="mb-3"><label class="form-label">Secret (optional)</label><input type="text" name="secret" class="form-control"></div>
+    </div>
+    <div class="modal-footer"><button type="submit" class="btn btn-success">Save</button></div>
+  </form>
+</div></div></div>
+
+<script>
+function toggleWebhook(id) { api('/webhooks/'+id+'/toggle',{method:'POST'}).then(r=>r.json()).then(d=>{if(d.success)location.reload();else Swal.fire('Error',d.message,'error');}); }
+function deleteWebhook(id) { Swal.fire({title:'Delete?',icon:'warning',showCancelButton:true}).then(r=>{if(r.isConfirmed)api('/webhooks/'+id,{method:'DELETE'}).then(r=>r.json()).then(d=>{if(d.success)location.reload();else Swal.fire('Error',d.message,'error');});}); }
+function testWebhook(event, id) {
+  const row = event.target.closest('tr');
+  const url = row?.querySelector('td:nth-child(2)')?.textContent?.trim() || '';
+  api('/webhooks/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,secret:''})}).then(r=>r.json()).then(d=>{
+    const detail = d.data ? 'Status: '+d.data.statusCode : '';
+    Swal.fire('Test '+(d.success?'OK':'Failed'), detail || d.message, d.success?'success':'error');
+  }).catch(e=>Swal.fire('Error',e.message,'error'));
+}
+</script>

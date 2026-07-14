@@ -1,0 +1,189 @@
+<%- include('../../partials/header') %>
+<%- include('../../partials/sidebar') %>
+<div class="main-content">
+  <%- include('../../partials/navbar') %>
+  <div class="content p-7 m-4">
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body d-flex justify-content-between align-items-center">
+        <div>
+          <h4 class="mb-0">Plan Management</h4>
+          <small class="text-muted">Role: <span class="badge bg-danger"><%= user?.role %></span></small>
+        </div>
+        <button class="btn btn-lg btn-success" onclick="openCreatePlan()">
+          <i class="fas fa-plus-circle"></i> Create New Plan
+        </button>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr><th>Name</th><th>Price</th><th>Validity</th><th>Instances</th><th>Daily</th><th>Monthly</th><th>API</th><th>Bulk</th><th>Campaign</th><th>Webhook</th><th>Media</th><th>Chatbot</th><th>Dynamic</th><th>Excel</th><th>In/Out</th><th>Groups</th><th>Contacts</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+              <% (plans || []).forEach(p => { %>
+                <tr>
+                  <td><strong><%= p.name %></strong></td>
+                  <td>₹<%= p.price.toLocaleString() %></td>
+                  <td><%= p.validity %>d</td>
+                  <td><%= p.features?.whatsappInstances === -1 ? '∞' : p.features?.whatsappInstances %></td>
+                  <td><%= p.features?.dailyMessageLimit === -1 ? '∞' : p.features?.dailyMessageLimit.toLocaleString() %></td>
+                  <td><%= p.features?.monthlyMessageLimit === -1 ? '∞' : p.features?.monthlyMessageLimit.toLocaleString() %></td>
+                  <td><%- p.features?.apiAccess ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>' %></td>
+                  <td><%- p.features?.bulkMessaging ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>' %></td>
+                  <td><%- p.features?.campaignAccess ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>' %></td>
+                  <td><%- p.features?.webhookAccess ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>' %></td>
+                  <td><%- p.features?.mediaMessaging ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>' %></td>
+                  <td><%- p.features?.chatbot ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>' %></td>
+                  <td><%- p.features?.dynamicMessaging ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>' %></td>
+                  <td><%- p.features?.exportData ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>' %></td>
+                  <td><%- (p.features?.outgoingMessages && p.features?.incomingMessages) ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>' %></td>
+                  <td><%= p.features?.groupsLimit === -1 ? '∞' : p.features?.groupsLimit %></td>
+                  <td><%= p.features?.contactsLimit === -1 ? '∞' : p.features?.contactsLimit.toLocaleString() %></td>
+                  <td><span class="badge bg-<%= p.isActive ? 'success' : 'secondary' %>"><%= p.isActive ? 'Active' : 'Inactive' %></span></td>
+                  <td nowrap>
+                    <button onclick="openEditPlan('<%= p._id %>')" class="btn btn-sm btn-primary"><i class="fas fa-edit"></i></button>
+                    <button onclick="deletePlan('<%= p._id %>')" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <%- include('../../partials/footer') %>
+</div>
+
+<div class="modal fade" id="planModal" data-bs-backdrop="static"><div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title" id="planModalTitle">Create Plan</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <form id="planForm">
+    <div class="modal-body">
+      <div class="row mb-2">
+        <div class="col"><label class="form-label">Plan Name</label><input id="ppn" class="form-control" required></div>
+        <div class="col"><label class="form-label">Price</label><input id="ppr" type="number" class="form-control" step="1" required></div>
+      </div>
+      <div class="row mb-2">
+        <div class="col"><label class="form-label">Currency</label><select id="pcurr" class="form-select"><option value="INR">₹ INR</option><option value="USD">$ USD</option></select></div>
+        <div class="col"><label class="form-label">Validity (days)</label><input id="ppv" type="number" class="form-control" required></div>
+      </div>
+      <div class="row mb-2">
+        <div class="col"><label class="form-label">WhatsApp Instances</label><input id="ppi" type="number" class="form-control" value="1"></div>
+        <div class="col"><label class="form-label">Groups Limit</label><input id="ppg" type="number" class="form-control" value="10"></div>
+      </div>
+      <div class="row mb-2">
+        <div class="col"><label class="form-label">Daily Message Limit</label><input id="ppd" type="number" class="form-control" value="100"></div>
+        <div class="col"><label class="form-label">Monthly Message Limit</label><input id="ppm" type="number" class="form-control" value="3000"></div>
+      </div>
+      <div class="row mb-2">
+        <div class="col"><label class="form-label">Contacts Limit</label><input id="ppc" type="number" class="form-control" value="500"></div>
+        <div class="col"></div>
+      </div>
+      <div class="mb-2"><label class="form-label">Features</label>
+        <div class="row">
+          <div class="col-4"><label class="form-check"><input id="ppapi" type="checkbox" class="form-check-input"> <span class="form-check-label">API Access</span></label></div>
+          <div class="col-4"><label class="form-check"><input id="ppcamp" type="checkbox" class="form-check-input"> <span class="form-check-label">Campaigns</span></label></div>
+          <div class="col-4"><label class="form-check"><input id="ppweb" type="checkbox" class="form-check-input"> <span class="form-check-label">Webhooks</span></label></div>
+          <div class="col-4"><label class="form-check"><input id="ppbulk" type="checkbox" class="form-check-input"> <span class="form-check-label">Bulk Msg</span></label></div>
+          <div class="col-4"><label class="form-check"><input id="ppchat" type="checkbox" class="form-check-input"> <span class="form-check-label">Chatbot</span></label></div>
+          <div class="col-4"><label class="form-check"><input id="ppdyn" type="checkbox" class="form-check-input"> <span class="form-check-label">Dynamic Msg</span></label></div>
+          <div class="col-4"><label class="form-check"><input id="ppout" type="checkbox" class="form-check-input" checked> <span class="form-check-label">Outgoing Msg</span></label></div>
+          <div class="col-4"><label class="form-check"><input id="ppinc" type="checkbox" class="form-check-input" checked> <span class="form-check-label">Incoming Msg</span></label></div>
+        </div>
+      </div>
+      <div class="mb-2" id="activeField" style="display:none"><label class="form-check"><input id="ppactive" type="checkbox" class="form-check-input" checked> <span class="form-check-label">Active</span></label></div>
+      <input type="hidden" id="planEditId">
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+      <button type="submit" class="btn btn-success">Save</button>
+    </div>
+  </form>
+</div></div></div>
+
+<script>
+function openCreatePlan() {
+  document.getElementById('planModalTitle').textContent = 'Create New Plan';
+  document.getElementById('planForm').reset();
+  document.getElementById('planEditId').value = '';
+  document.getElementById('activeField').style.display = 'none';
+  new bootstrap.Modal(document.getElementById('planModal')).show();
+}
+
+function openEditPlan(id) {
+  fetch('/plans/'+id).then(r=>r.json()).then(res => {
+    if (!res.success) { Swal.fire('Error', res.message, 'error'); return; }
+    const p = res.data.plan;
+    document.getElementById('planModalTitle').textContent = 'Edit: ' + p.name;
+    document.getElementById('planEditId').value = id;
+    document.getElementById('ppn').value = p.name;
+    document.getElementById('ppr').value = p.price;
+    document.getElementById('pcurr').value = p.currency || 'INR';
+    document.getElementById('ppv').value = p.validity;
+    document.getElementById('ppi').value = p.features?.whatsappInstances || 1;
+    document.getElementById('ppg').value = p.features?.groupsLimit || 10;
+    document.getElementById('ppd').value = p.features?.dailyMessageLimit || 100;
+    document.getElementById('ppm').value = p.features?.monthlyMessageLimit || 3000;
+    document.getElementById('ppc').value = p.features?.contactsLimit || 500;
+    document.getElementById('ppapi').checked = p.features?.apiAccess || false;
+    document.getElementById('ppcamp').checked = p.features?.campaignAccess || false;
+    document.getElementById('ppweb').checked = p.features?.webhookAccess || false;
+    document.getElementById('ppbulk').checked = p.features?.bulkMessaging || false;
+    document.getElementById('ppchat').checked = p.features?.chatbot || false;
+    document.getElementById('ppdyn').checked = p.features?.dynamicMessaging || false;
+    document.getElementById('ppout').checked = p.features?.outgoingMessages !== false;
+    document.getElementById('ppinc').checked = p.features?.incomingMessages !== false;
+    document.getElementById('ppactive').checked = p.isActive;
+    document.getElementById('activeField').style.display = 'block';
+    new bootstrap.Modal(document.getElementById('planModal')).show();
+  });
+}
+
+document.getElementById('planForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const editId = document.getElementById('planEditId').value;
+  const data = {
+    name: document.getElementById('ppn').value,
+    price: parseFloat(document.getElementById('ppr').value) || 0,
+    currency: document.getElementById('pcurr').value,
+    validity: parseInt(document.getElementById('ppv').value) || 30,
+    isActive: document.getElementById('ppactive').checked,
+    features: {
+      whatsappInstances: parseInt(document.getElementById('ppi').value) || 1,
+      groupsLimit: parseInt(document.getElementById('ppg').value) || 10,
+      dailyMessageLimit: parseInt(document.getElementById('ppd').value) || 100,
+      monthlyMessageLimit: parseInt(document.getElementById('ppm').value) || 3000,
+      contactsLimit: parseInt(document.getElementById('ppc').value) || 500,
+      apiAccess: document.getElementById('ppapi').checked,
+      campaignAccess: document.getElementById('ppcamp').checked,
+      webhookAccess: document.getElementById('ppweb').checked,
+      bulkMessaging: document.getElementById('ppbulk').checked,
+      chatbot: document.getElementById('ppchat').checked,
+      dynamicMessaging: document.getElementById('ppdyn').checked,
+      outgoingMessages: document.getElementById('ppout').checked,
+      incomingMessages: document.getElementById('ppinc').checked,
+      mediaMessaging: true,
+    },
+  };
+  if (!data.name) { Swal.fire('Error', 'Plan name required', 'error'); return; }
+  const url = editId ? '/plans/'+editId : '/plans';
+  const method = editId ? 'PUT' : 'POST';
+  fetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) })
+    .then(r=>r.json()).then(d=>{
+      if(d.success) {
+        bootstrap.Modal.getInstance(document.getElementById('planModal')).hide();
+        Swal.fire('Done', editId ? 'Plan updated' : 'Plan created', 'success').then(()=>location.reload());
+      } else {
+        Swal.fire('Error', d.message, 'error');
+      }
+    }).catch(e=>Swal.fire('Error', e.message, 'error'));
+});
+
+function deletePlan(id) {
+  Swal.fire({ title:'Delete this plan?', icon:'warning', showCancelButton:true })
+    .then(r => { if(r.isConfirmed) fetch('/plans/'+id, {method:'DELETE',headers:{'x-csrf-token':csrfToken,'Accept':'application/json'}}).then(r=>r.json()).then(d=>{ if(d.success) location.reload(); else Swal.fire('Error',d.message,'error'); }); });
+}
+</script>

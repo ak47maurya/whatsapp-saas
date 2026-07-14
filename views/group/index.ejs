@@ -1,0 +1,105 @@
+<%- include('../partials/header') %>
+<%- include('../partials/sidebar') %>
+<div class="main-content">
+  <%- include('../partials/navbar') %>
+  <div class="content p-7 m-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="mb-0">Groups</h4>
+      <div>
+        <select id="instanceSelect" class="form-select form-select-sm d-inline-block w-auto" onchange="fetchGroups(this.value)">
+          <option value="">Select Instance</option>
+          <% (instances || []).forEach(i => { %><option value="<%= i._id %>"><%= i.name %></option><% }) %>
+        </select>
+      </div>
+    </div>
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <table class="table datatable">
+          <thead><tr><th>Name</th><th>Group ID</th><th>Members</th><th>Description</th><th>Fetched</th><th>Actions</th></tr></thead>
+          <tbody>
+            <% (groups || []).forEach(g => { %>
+              <tr>
+                <td><%= g.name %></td>
+                <td><code style="font-size:12px"><%= g.jid %></code></td>
+                <td><%= g.size || g.members?.length || 0 %></td>
+                <td class="text-truncate" style="max-width:150px"><%= g.description || '—' %></td>
+                <td><%= new Date(g.createdAt).toLocaleDateString() %></td>
+                <td>
+                  <button onclick="viewMembers('<%= g._id %>')" class="btn btn-sm btn-info" title="Members"><i class="fas fa-users"></i></button>
+                  <button onclick="sendToGroup('<%= g._id %>','<%= g.jid %>','<%= g.name.replace(/'/g,"\\'") %>')" class="btn btn-sm btn-success" title="Send Message"><i class="fas fa-paper-plane"></i></button>
+                  <button onclick="deleteGroup('<%= g._id %>')" class="btn btn-sm btn-outline-danger" title="Delete"><i class="fas fa-trash"></i></button>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <%- include('../partials/footer') %>
+</div>
+<div class="modal fade" id="groupSendModal"><div class="modal-dialog"><div class="modal-content">
+  <div class="modal-header"><h5>Send to Group</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+  <form onsubmit="return groupSendSubmit(event)">
+    <div class="modal-body">
+      <input type="hidden" id="gsJid">
+      <p class="mb-3"><strong id="gsName"></strong></p>
+      <div class="mb-3"><label class="form-label">Instance</label>
+        <select id="gsInstance" class="form-select" required>
+          <% (instances || []).filter(i => i.status === 'connected').forEach(i => { %><option value="<%= i._id %>"><%= i.name %></option><% }) %>
+        </select>
+      </div>
+      <div class="mb-3"><label class="form-label">Message</label><textarea id="gsText" class="form-control" rows="3" required></textarea></div>
+    </div>
+    <div class="modal-footer"><button type="submit" class="btn btn-success"><i class="fas fa-paper-plane"></i> Send</button></div>
+  </form>
+</div></div></div>
+
+<script>
+function sendToGroup(id, jid, name) {
+  document.getElementById('gsJid').value = jid;
+  document.getElementById('gsName').textContent = 'Send to: ' + name;
+  new bootstrap.Modal(document.getElementById('groupSendModal')).show();
+}
+function groupSendSubmit(e) {
+  e.preventDefault();
+  const btn = e.target.querySelector('button[type=submit]');
+  btn.disabled = true;
+  api('/groups/send', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ instanceId: document.getElementById('gsInstance').value, groupJid: document.getElementById('gsJid').value, text: document.getElementById('gsText').value }),
+  }).then(r=>r.json()).then(d=>{
+    btn.disabled = false;
+    if(d.success) { bootstrap.Modal.getInstance(document.getElementById('groupSendModal')).hide(); Swal.fire('Sent!','Message sent to group','success'); }
+    else Swal.fire('Error',d.message,'error');
+  }).catch(e=>{btn.disabled=false;Swal.fire('Error',e.message,'error');});
+  return false;
+}
+function fetchGroups(instanceId) {
+  if (!instanceId) return;
+  Swal.fire({title:'Fetching groups...',allowOutsideClick:false, didOpen:()=>Swal.showLoading()});
+  api('/groups/'+instanceId+'/fetch',{method:'POST'}).then(r=>r.json()).then(d=>{Swal.close();if(d.success)location.reload();else Swal.fire('Error',d.message,'error');});
+}
+function viewMembers(id) {
+  Swal.fire({title:'Loading members...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
+  api('/groups/'+id+'/members',{headers:{'Accept':'application/json'}})
+    .then(r=>r.json()).then(d=>{
+      Swal.close();
+      if(!d.success){Swal.fire('Error',d.message,'error');return;}
+      const members = d.data?.members || [];
+      let html = '<div style="max-height:400px;overflow-y:auto"><table class="table table-sm table-bordered mb-0"><thead><tr><th>#</th><th>Name</th><th>Phone</th><th>Admin</th></tr></thead><tbody>';
+      members.forEach((m,i)=>{
+        const name = m.name || '—';
+        const phone = m.phone || m.jid?.split('@')[0] || '—';
+        const isAdmin = m.admin || m.role === 'admin' ? '<i class="fas fa-crown text-warning"></i>' : '—';
+        html += '<tr><td>'+(i+1)+'</td><td>'+escapeHtml(name)+'</td><td>'+escapeHtml(phone)+'</td><td>'+isAdmin+'</td></tr>';
+      });
+      html += '</tbody></table></div>';
+      if(!members.length) html = '<p class="text-muted">No members found.</p>';
+      Swal.fire({title:'Members ('+members.length+')',html,width:600});
+    }).catch(e=>{Swal.close();Swal.fire('Error',e.message,'error');});
+}
+function escapeHtml(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML;}
+function deleteGroup(id) { Swal.fire({title:'Delete?',icon:'warning',showCancelButton:true}).then(r=>{if(r.isConfirmed)api('/groups/'+id,{method:'DELETE'}).then(r=>r.json()).then(d=>{if(d.success)location.reload();else Swal.fire('Error',d.message,'error');});}); }
+</script>

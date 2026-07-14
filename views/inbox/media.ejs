@@ -1,0 +1,74 @@
+<%- include('../partials/header') %>
+<%- include('../partials/sidebar') %>
+<div class="main-content">
+  <%- include('../partials/navbar') %>
+  <div class="content p-7 m-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="mb-0"><i class="fas fa-folder-open me-2"></i>Media Gallery</h4>
+      <div>
+        <a href="?instanceId=<%= selectedInstance %>&mediaType=" class="btn btn-sm <%= !mediaType ? 'btn-primary' : 'btn-outline-primary' %> me-1">All</a>
+        <a href="?instanceId=<%= selectedInstance %>&mediaType=image" class="btn btn-sm <%= mediaType==='image' ? 'btn-primary' : 'btn-outline-primary' %> me-1"><i class="fas fa-image"></i> Images</a>
+        <a href="?instanceId=<%= selectedInstance %>&mediaType=video" class="btn btn-sm <%= mediaType==='video' ? 'btn-primary' : 'btn-outline-primary' %> me-1"><i class="fas fa-video"></i> Videos</a>
+        <a href="?instanceId=<%= selectedInstance %>&mediaType=audio" class="btn btn-sm <%= mediaType==='audio' ? 'btn-primary' : 'btn-outline-primary' %> me-1"><i class="fas fa-microphone"></i> Voice</a>
+        <a href="?instanceId=<%= selectedInstance %>&mediaType=document" class="btn btn-sm <%= mediaType==='document' ? 'btn-primary' : 'btn-outline-primary' %>"><i class="fas fa-file"></i> Docs</a>
+      </div>
+    </div>
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body py-2 d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2">
+          <span class="text-muted small"><i class="fas fa-inbox"></i> <%= total %> file(s)</span>
+        </div>
+        <div class="d-flex gap-1">
+          <select class="form-select form-select-sm" style="width:auto" onchange="window.location='?instanceId=<%= selectedInstance %><%= mediaType ? '&mediaType='+mediaType : '' %>&direction='+this.value">
+            <option value="">Incoming & Outgoing</option>
+            <option value="incoming" <%= direction==='incoming'?'selected':'' %>>Incoming</option>
+            <option value="outgoing" <%= direction==='outgoing'?'selected':'' %>>Sent</option>
+          </select>
+          <select class="form-select form-select-sm" style="width:auto" onchange="window.location='?instanceId='+this.value+'&mediaType=<%= mediaType %><%= direction ? '&direction='+direction : '' %>'">
+            <option value="">Select Instance</option>
+            <% (instances || []).forEach(i => { %>
+              <option value="<%= i._id %>" <%= String(selectedInstance) === String(i._id) ? 'selected' : '' %>><%= i.name %></option>
+            <% }) %>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <% if (files.length === 0) { %>
+          <div class="text-center text-muted py-5">
+            <i class="fas fa-folder-open" style="font-size:4rem;color:#dee2e6"></i>
+            <p class="mt-3 mb-0">No media files found</p>
+            <small>Media files from messages will appear here automatically</small>
+          </div>
+        <% } else { %>
+          <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0 datatable">
+              <thead class="table-light"><tr><th>#</th><th>Type</th><th>File Name</th><th>Caption</th><th>File URL</th><th>Direction</th><th>Date</th></tr></thead>
+              <tbody>
+                <% (files || []).forEach((f, i) => { %>
+                  <tr>
+                    <td><%= (page-1)*50 + i + 1 %></td>
+                    <td>
+                      <% if (f.mediaType === 'image') { %><i class="fas fa-image text-primary"></i><% } else if (f.mediaType === 'video') { %><i class="fas fa-video" style="color:#5c6bc0"></i><% } else if (f.mediaType === 'audio') { %><i class="fas fa-microphone" style="color:#e91e63"></i><% } else if (f.mediaType === 'document') { %><i class="fas fa-file" style="color:#ff9800"></i><% } else { %><i class="fas fa-paperclip text-muted"></i><% } %>
+                      <span class="small ms-1"><%= f.mediaType %></span>
+                    </td>
+                    <td class="small"><%= f.fileName || '-' %></td>
+                    <td class="small text-muted"><%= f.caption || '-' %></td>
+                    <td><a href="<%= f.url %>" target="_blank" class="text-truncate d-inline-block" style="max-width:350px"><%= f.url %></a></td>
+                    <td><span class="badge bg-<%= f.direction==='incoming'?'info':'secondary' %>"><%= f.direction %></span></td>
+                    <td class="small text-nowrap"><%= new Date(f.createdAt).toLocaleDateString() %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+          <% if (total > 50) { %>
+            <nav class="mt-3"><ul class="pagination pagination-sm justify-content-center"><li class="page-item <%= page<=1?'disabled':'' %>"><a class="page-link" href="?instanceId=<%= selectedInstance %>&page=<%= page-1 %><%= mediaType?'&mediaType='+mediaType:'' %><%= direction?'&direction='+direction:'' %>">Prev</a></li><% for(let p=1;p<=Math.ceil(total/50);p++){ %><li class="page-item <%= p===page?'active':'' %>"><a class="page-link" href="?instanceId=<%= selectedInstance %>&page=<%= p %><%= mediaType?'&mediaType='+mediaType:'' %><%= direction?'&direction='+direction:'' %>"><%= p %></a></li><% } %><li class="page-item <%= page>=Math.ceil(total/50)?'disabled':'' %>"><a class="page-link" href="?instanceId=<%= selectedInstance %>&page=<%= page+1 %><%= mediaType?'&mediaType='+mediaType:'' %><%= direction?'&direction='+direction:'' %>">Next</a></li></ul></nav>
+          <% } %>
+        <% } %>
+      </div>
+    </div>
+  </div>
+  <%- include('../partials/footer') %>
+</div>

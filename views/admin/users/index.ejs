@@ -1,0 +1,311 @@
+<%- include('../../partials/header') %>
+<%- include('../../partials/sidebar') %>
+<div class="main-content">
+  <%- include('../../partials/navbar') %>
+  <div class="content p-7 m-4">
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body d-flex justify-content-between align-items-center">
+        <div>
+          <h4 class="mb-0">User Management</h4>
+          <small class="text-muted">Role: <span class="badge bg-danger"><%= user?.role %></span></small>
+        </div>
+        <button class="btn btn-lg btn-success" onclick="openCreateUser()">
+          <i class="fas fa-plus-circle"></i> Add New User
+        </button>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <form class="row g-2" onsubmit="event.preventDefault(); location.href='/users?search='+document.getElementById('s').value+'&role='+document.getElementById('r').value+'&status='+document.getElementById('st').value;">
+          <div class="col"><input id="s" type="search" class="form-control" placeholder="Search..." value="<%= filters?.search || '' %>"></div>
+          <div class="col-auto">
+            <select id="r" class="form-select">
+              <option value="">All Roles</option><% (roles || []).forEach(r => { %><option value="<%= r %>" <%= filters?.role === r ? 'selected' : '' %>><%= r %></option><% }) %>
+            </select>
+          </div>
+          <div class="col-auto">
+            <select id="st" class="form-select">
+              <option value="">All Status</option><% (statuses || []).forEach(s => { %><option value="<%= s %>" <%= filters?.status === s ? 'selected' : '' %>><%= s %></option><% }) %>
+            </select>
+          </div>
+          <div class="col-auto"><button class="btn btn-primary"><i class="fas fa-search"></i></button></div>
+        </form>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light"><tr>
+              <th>Name</th><th>Email</th><th>Plan</th><th>Role</th><th>Status</th><th>Verified</th><th>Actions</th>
+            </tr></thead>
+            <tbody>
+              <% (users || []).forEach(u => { %>
+                <% const sub = u.subscription; %>
+                <tr>
+                  <td><strong><%= u.name %></strong></td>
+                  <td><%= u.email %></td>
+                  <td>
+                    <% if (sub && sub.plan) { %>
+                      <span class="badge bg-primary"><%= sub.plan.name %></span>
+                    <% } else { %>
+                      <span class="badge bg-secondary">No Plan</span>
+                    <% } %>
+                  </td>
+                  <td><span class="badge bg-<%= u.role === 'super_admin' ? 'danger' : u.role === 'admin' ? 'warning' : 'info' %>"><%= u.role %></span></td>
+                  <td><span class="badge bg-<%= u.status === 'active' ? 'success' : u.status === 'suspended' ? 'danger' : 'secondary' %>"><%= u.status %></span></td>
+                  <td><%- u.emailVerified ? '<i class="fas fa-check-circle text-success"></i>' : '<i class="fas fa-times-circle text-danger"></i>' %></td>
+                  <td nowrap>
+                    <button onclick="viewDetails('<%= u._id %>')" class="btn btn-sm btn-info" title="Details"><i class="fas fa-eye"></i></button>
+                    <% if (u.role !== 'super_admin') { %>
+                      <button onclick="changePlan('<%= u._id %>')" class="btn btn-sm btn-primary" title="Change Plan"><i class="fas fa-exchange-alt"></i></button>
+                      <% if (u.status === 'active') { %><button onclick="suspendUser('<%= u._id %>')" class="btn btn-sm btn-warning" title="Suspend"><i class="fas fa-pause"></i></button><% } %>
+                      <% if (u.status !== 'active') { %><button onclick="activateUser('<%= u._id %>')" class="btn btn-sm btn-success" title="Activate"><i class="fas fa-play"></i></button><% } %>
+                      <button onclick="deleteUser('<%= u._id %>')" class="btn btn-sm btn-danger" title="Delete"><i class="fas fa-trash"></i></button>
+                    <% } else { %>
+                      <span class="text-muted small">—</span>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <%- include('../../partials/footer') %>
+</div>
+
+<div class="modal fade" id="detailModal" data-bs-backdrop="static"><div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title">User Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body" id="detailBody">Loading...</div>
+  <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>
+</div></div></div>
+
+<div class="modal fade" id="changePlanModal" data-bs-backdrop="static"><div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title">Change User Plan</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <form id="changePlanForm">
+    <input type="hidden" id="cpUserId">
+    <div class="modal-body">
+      <div class="mb-3">
+        <label class="form-label">Select Plan</label>
+        <select id="cpPlan" class="form-select"></select>
+      </div>
+      <div class="mb-2"><label class="form-check"><input type="checkbox" id="cpCustomToggle" onchange="document.getElementById('cpCustomFields').style.display=this.checked?'block':'none'"> <span class="form-check-label">Custom Features</span></label></div>
+      <div id="cpCustomFields" style="display:none">
+        <p class="text-muted small mb-2">Leave fields empty to use plan defaults</p>
+        <div class="row mb-2">
+          <div class="col"><label class="form-label small">Validity (days)</label><input id="cp_val" type="number" class="form-control form-control-sm" placeholder="Plan default"></div>
+          <div class="col"><label class="form-label small">WhatsApp Instances</label><input id="cp_inst" type="number" class="form-control form-control-sm" placeholder="Plan default"></div>
+        </div>
+        <div class="row mb-2">
+          <div class="col"><label class="form-label small">Daily Messages</label><input id="cp_daily" type="number" class="form-control form-control-sm" placeholder="Plan default"></div>
+          <div class="col"><label class="form-label small">Monthly Messages</label><input id="cp_monthly" type="number" class="form-control form-control-sm" placeholder="Plan default"></div>
+        </div>
+        <div class="row mb-2">
+          <div class="col"><label class="form-label small">Contacts Limit</label><input id="cp_contacts" type="number" class="form-control form-control-sm" placeholder="Plan default"></div>
+          <div class="col"><label class="form-label small">Groups Limit</label><input id="cp_groups" type="number" class="form-control form-control-sm" placeholder="Plan default"></div>
+        </div>
+        <div class="row mb-2">
+          <div class="col"><label class="form-label small">Team Members</label><input id="cp_team" type="number" class="form-control form-control-sm" placeholder="Plan default"></div>
+          <div class="col"><label class="form-label small">API Keys</label><input id="cp_apikeys" type="number" class="form-control form-control-sm" placeholder="Plan default"></div>
+        </div>
+        <div class="row mb-2">
+          <div class="col"><label class="form-label small">Webhook URLs</label><input id="cp_weburls" type="number" class="form-control form-control-sm" placeholder="Plan default"></div>
+          <div class="col"></div>
+        </div>
+        <hr class="my-2">
+        <div class="row mb-2">
+          <div class="col"><label class="form-label small">API Access</label><select id="cp_api" class="form-select form-select-sm"><option value="">Default</option><option value="true">Yes</option><option value="false">No</option></select></div>
+          <div class="col"><label class="form-label small">Campaign Access</label><select id="cp_campaign" class="form-select form-select-sm"><option value="">Default</option><option value="true">Yes</option><option value="false">No</option></select></div>
+        </div>
+        <div class="row mb-2">
+          <div class="col"><label class="form-label small">Bulk Messaging</label><select id="cp_bulk" class="form-select form-select-sm"><option value="">Default</option><option value="true">Yes</option><option value="false">No</option></select></div>
+          <div class="col"><label class="form-label small">Webhook Access</label><select id="cp_webhook" class="form-select form-select-sm"><option value="">Default</option><option value="true">Yes</option><option value="false">No</option></select></div>
+        </div>
+        <div class="row mb-2">
+          <div class="col"><label class="form-label small">Chatbot</label><select id="cp_chatbot" class="form-select form-select-sm"><option value="">Default</option><option value="true">Yes</option><option value="false">No</option></select></div>
+          <div class="col"><label class="form-label small">Dynamic Messaging</label><select id="cp_dynamic" class="form-select form-select-sm"><option value="">Default</option><option value="true">Yes</option><option value="false">No</option></select></div>
+        </div>
+        <div class="row mb-2">
+          <div class="col"><label class="form-label small">Scheduler</label><select id="cp_scheduler" class="form-select form-select-sm"><option value="">Default</option><option value="true">Yes</option><option value="false">No</option></select></div>
+          <div class="col"><label class="form-label small">Media Messaging</label><select id="cp_media" class="form-select form-select-sm"><option value="">Default</option><option value="true">Yes</option><option value="false">No</option></select></div>
+        </div>
+        <div class="row mb-2">
+          <div class="col"><label class="form-label small">Export Data</label><select id="cp_export" class="form-select form-select-sm"><option value="">Default</option><option value="true">Yes</option><option value="false">No</option></select></div>
+          <div class="col"><label class="form-label small">Outgoing Messages</label><select id="cp_out" class="form-select form-select-sm"><option value="">Default</option><option value="true">Yes</option><option value="false">No</option></select></div>
+        </div>
+        <div class="row mb-2">
+          <div class="col"><label class="form-label small">Incoming Messages</label><select id="cp_inc" class="form-select form-select-sm"><option value="">Default</option><option value="true">Yes</option><option value="false">No</option></select></div>
+          <div class="col"><label class="form-label small">WhatsApp Channels</label><select id="cp_ch" class="form-select form-select-sm"><option value="">Default</option><option value="true">Yes</option><option value="false">No</option></select></div>
+        </div>
+        <div class="mb-2"><label class="form-label small">Notes</label><textarea id="cp_note" class="form-control form-control-sm" rows="2" placeholder="Why this custom plan?"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+      <button type="submit" class="btn btn-primary">Change Plan</button>
+    </div>
+  </form>
+</div></div></div>
+
+<div class="modal fade" id="createUserModal"><div class="modal-dialog"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title">Create New User</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <form id="createUserForm">
+    <div class="modal-body">
+      <div class="mb-3">
+        <label class="form-label">Full Name</label>
+        <input type="text" id="uname" class="form-control" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Email</label>
+        <input type="email" id="uemail" class="form-control" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Password</label>
+        <input type="password" id="upass" class="form-control" placeholder="min 8 characters" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Role</label>
+        <select id="urole" class="form-select">
+          <option value="customer">Customer</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+      <button type="submit" class="btn btn-success">Create User</button>
+    </div>
+  </form>
+</div></div></div>
+
+<script>
+function openCreateUser() {
+  document.getElementById('createUserForm').reset();
+  new bootstrap.Modal(document.getElementById('createUserModal')).show();
+}
+
+document.getElementById('createUserForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const data = {
+    name: document.getElementById('uname').value,
+    email: document.getElementById('uemail').value,
+    password: document.getElementById('upass').value,
+    role: document.getElementById('urole').value,
+  };
+  if (!data.name || !data.email || !data.password) { Swal.fire('Error','All fields required','error'); return; }
+  api('/users', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) })
+    .then(r=>r.json()).then(d=>{
+      if(d.success) {
+        bootstrap.Modal.getInstance(document.getElementById('createUserModal')).hide();
+        Swal.fire('Done','User created successfully','success').then(()=>location.reload());
+      } else {
+        Swal.fire('Error',d.message,'error');
+      }
+    }).catch(e=>Swal.fire('Error',e.message,'error'));
+});
+
+function viewDetails(id) {
+  api('/users/'+id, {headers:{'Accept':'application/json'}}).then(r=>r.json()).then(res => {
+    if (!res.success) { Swal.fire('Error', res.message, 'error'); return; }
+    const u = res.data.user;
+    const sub = u.subscription;
+    const counts = res.data.instanceCounts || {};
+    const html = `
+      <div class="row mb-3">
+        <div class="col-6"><strong>Name:</strong> ${u.name}</div>
+        <div class="col-6"><strong>Email:</strong> ${u.email}</div>
+      </div>
+      <div class="row mb-3">
+        <div class="col-6"><strong>Phone:</strong> ${u.phone || '—'}</div>
+        <div class="col-6"><strong>Role:</strong> <span class="badge bg-${u.role === 'super_admin' ? 'danger' : u.role === 'admin' ? 'warning' : 'info'}">${u.role}</span></div>
+      </div>
+      <div class="row mb-3">
+        <div class="col-6"><strong>Status:</strong> <span class="badge bg-${u.status === 'active' ? 'success' : u.status === 'suspended' ? 'danger' : 'secondary'}">${u.status}</span></div>
+        <div class="col-6"><strong>Verified:</strong> ${u.emailVerified ? '<i class="fas fa-check-circle text-success"></i> Yes' : '<i class="fas fa-times-circle text-danger"></i> No'}</div>
+      </div>
+      <div class="row mb-3">
+        <div class="col-6"><strong>Created:</strong> ${new Date(u.createdAt).toLocaleDateString()}</div>
+        <div class="col-6"><strong>Last Login:</strong> ${u.lastLogin ? new Date(u.lastLogin).toLocaleString() : 'Never'}</div>
+      </div>
+      <div class="row mb-3">
+        <div class="col-6"><strong>Created By:</strong> ${u.createdBy?.name || '—'}</div>
+        <div class="col-6"><strong>Instances:</strong> ${counts.total || 0} (${counts.connected || 0} connected)</div>
+      </div>
+      <hr>
+      <h6>Subscription Plan</h6>
+      ${sub && sub.plan ? `
+      <div class="row mb-2">
+        <div class="col-6"><strong>Plan:</strong> ${sub.plan.name} (<span class="${sub.status === 'active' ? 'text-success' : 'text-danger'}">${sub.status}</span>)</div>
+        <div class="col-6"><strong>Price:</strong> ₹${sub.price?.toLocaleString() || '0'}</div>
+      </div>
+      <div class="row mb-2">
+        <div class="col-6"><strong>Start:</strong> ${new Date(sub.startDate).toLocaleDateString()}</div>
+        <div class="col-6"><strong>End:</strong> ${new Date(sub.endDate).toLocaleDateString()}</div>
+      </div>
+      ${sub.notes ? '<div class="mb-2"><strong>Admin Notes:</strong><br><pre class="bg-light p-2 rounded small">'+sub.notes+'</pre></div>' : ''}
+      ${sub.isCustom ? '<div class="mb-2"><span class="badge bg-warning text-dark">Custom Features</span></div>' : ''}
+      <div class="table-responsive"><table class="table table-sm table-bordered mb-0"><thead><tr><th>Feature</th><th>Value</th></tr></thead><tbody>
+        ${['whatsappInstances','dailyMessageLimit','monthlyMessageLimit','contactsLimit','groupsLimit','apiAccess','bulkMessaging','campaignAccess','webhookAccess','chatbot','dynamicMessaging','outgoingMessages','incomingMessages','mediaMessaging','scheduler','teamMembers','apiKeys','webhookUrls','exportData'].map(f => {
+          const val = sub.features?.[f];
+          const display = val === true ? '<i class="fas fa-check text-success"></i>' : val === false ? '<i class="fas fa-times text-danger"></i>' : val === -1 ? '∞' : val;
+          return '<tr><td>'+f+'</td><td>'+display+'</td></tr>';
+        }).join('')}
+      </tbody></table></div>
+      ` : '<p class="text-muted">No active subscription</p>'}
+    `;
+    document.getElementById('detailBody').innerHTML = html;
+    new bootstrap.Modal(document.getElementById('detailModal')).show();
+  }).catch(e => Swal.fire('Error', e.message, 'error'));
+}
+
+function changePlan(userId) {
+  api('/plans', { headers: { 'Accept': 'application/json' } }).then(r => r.json()).then(data => {
+    if (!data.success) { Swal.fire('Error', 'Failed to load plans', 'error'); return; }
+    const plans = data.data?.plans || [];
+    const sel = document.getElementById('cpPlan');
+    sel.innerHTML = plans.map(p => `<option value="${p._id}">${p.name} (₹${p.price.toLocaleString()})</option>`).join('');
+    document.getElementById('cpUserId').value = userId;
+    document.getElementById('cpCustomToggle').checked = false;
+    document.getElementById('cpCustomFields').style.display = 'none';
+    ['cp_val','cp_inst','cp_daily','cp_monthly','cp_contacts','cp_groups','cp_team','cp_apikeys','cp_weburls','cp_api','cp_campaign','cp_bulk','cp_webhook','cp_chatbot','cp_dynamic','cp_scheduler','cp_media','cp_export','cp_out','cp_inc','cp_ch','cp_note'].forEach(id => document.getElementById(id).value = '');
+    new bootstrap.Modal(document.getElementById('changePlanModal')).show();
+  });
+}
+
+document.getElementById('changePlanForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const userId = document.getElementById('cpUserId').value;
+  const planId = document.getElementById('cpPlan').value;
+  if (!planId) { Swal.fire('Error', 'Select a plan', 'error'); return; }
+  const body = { userId, planId };
+  if (document.getElementById('cpCustomToggle').checked) {
+    const cf = {};
+    const map = { cp_val:'validityDays', cp_inst:'whatsappInstances', cp_daily:'dailyMessageLimit', cp_monthly:'monthlyMessageLimit', cp_contacts:'contactsLimit', cp_groups:'groupsLimit', cp_team:'teamMembers', cp_apikeys:'apiKeys', cp_weburls:'webhookUrls', cp_api:'apiAccess', cp_campaign:'campaignAccess', cp_bulk:'bulkMessaging', cp_webhook:'webhookAccess', cp_chatbot:'chatbot', cp_dynamic:'dynamicMessaging', cp_scheduler:'scheduler', cp_media:'mediaMessaging', cp_export:'exportData', cp_out:'outgoingMessages', cp_inc:'incomingMessages' };
+    for (const [id, key] of Object.entries(map)) {
+      const el = document.getElementById(id);
+      if (el.value !== '') cf[key] = el.value;
+    }
+    if (Object.keys(cf).length) { body.customFeatures = cf; body.customNote = document.getElementById('cp_note').value; }
+  }
+  const btn = e.target.querySelector('button[type=submit]');
+  btn.disabled = true;
+  api('/subscriptions/admin-change-plan', { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) })
+    .then(r=>r.json()).then(d=>{
+      btn.disabled = false;
+      if(d.success) {
+        bootstrap.Modal.getInstance(document.getElementById('changePlanModal')).hide();
+        Swal.fire('Done','Plan changed successfully','success').then(()=>location.reload());
+      } else {
+        Swal.fire('Error', d.message, 'error');
+      }
+    }).catch(e => { btn.disabled = false; Swal.fire('Error', e.message, 'error'); });
+});
+function suspendUser(id) { Swal.fire({title:'Suspend?',icon:'warning',showCancelButton:true}).then(r=>{if(r.isConfirmed)api('/users/'+id+'/suspend',{method:'PUT'}).then(r=>r.json()).then(d=>{if(d.success)location.reload();else Swal.fire('Error',d.message,'error');});}); }
+function activateUser(id) { Swal.fire({title:'Activate?',icon:'question',showCancelButton:true}).then(r=>{if(r.isConfirmed)api('/users/'+id+'/activate',{method:'PUT'}).then(r=>r.json()).then(d=>{if(d.success)location.reload();else Swal.fire('Error',d.message,'error');});}); }
+function deleteUser(id) { Swal.fire({title:'Delete forever?',icon:'warning',showCancelButton:true}).then(r=>{if(r.isConfirmed)api('/users/'+id,{method:'DELETE'}).then(r=>r.json()).then(d=>{if(d.success)location.reload();else Swal.fire('Error',d.message,'error');});}); }
+</script>

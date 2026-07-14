@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %> - <%= appName %></title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fc; }
+    .hero {
+      background: linear-gradient(135deg, #075e54 0%, #128c7e 50%, #25d366 100%);
+      color: #fff; padding: 100px 0 80px; text-align: center;
+    }
+    .hero h1 { font-size: 3rem; font-weight: 800; margin-bottom: 1rem; }
+    .hero p { font-size: 1.2rem; opacity: 0.9; max-width: 600px; margin: 0 auto 2rem; }
+    .hero .btn-outline-light { border-width: 2px; font-weight: 600; }
+    .section-title { text-align: center; margin-bottom: 3rem; }
+    .section-title h2 { font-weight: 700; color: #1a1a2e; }
+    .section-title p { color: #6c757d; }
+    .feature-card {
+      background: #fff; border-radius: 16px; padding: 2rem; text-align: center;
+      box-shadow: 0 2px 15px rgba(0,0,0,0.06); transition: transform 0.3s; height: 100%;
+    }
+    .feature-card:hover { transform: translateY(-5px); }
+    .feature-card i { font-size: 2.5rem; color: #128c7e; margin-bottom: 1rem; }
+    .plan-card {
+      background: #fff; border-radius: 20px; padding: 2rem; text-align: center;
+      box-shadow: 0 2px 20px rgba(0,0,0,0.08); transition: transform 0.3s; height: 100%;
+      position: relative;
+    }
+    .plan-card:hover { transform: translateY(-5px); }
+    .plan-card.popular { border: 2px solid #25d366; }
+    .plan-card .badge-popular {
+      position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+      background: #25d366; color: #fff; padding: 4px 20px; border-radius: 20px;
+      font-weight: 600; font-size: 0.8rem;
+    }
+    .plan-card .price { font-size: 2.5rem; font-weight: 800; color: #075e54; }
+    .plan-card .price small { font-size: 0.9rem; color: #6c757d; font-weight: 400; }
+    .plan-card ul { text-align: left; margin: 1.5rem 0; }
+    .plan-card ul li { margin-bottom: 0.6rem; font-size: 0.95rem; }
+    .plan-card .btn-whatsapp {
+      background: #25d366; color: #fff; font-weight: 600; border-radius: 50px;
+      padding: 12px 30px; width: 100%; border: none; font-size: 1rem;
+    }
+    .plan-card .btn-whatsapp:hover { background: #1da851; }
+    .footer {
+      background: #1a1a2e; color: #fff; text-align: center; padding: 2rem;
+    }
+    .footer a { color: #25d366; text-decoration: none; }
+    .navbar-landing {
+      background: rgba(7, 94, 84, 0.95); backdrop-filter: blur(10px);
+      padding: 1rem 0;
+    }
+    .navbar-landing .navbar-brand { color: #fff; font-weight: 700; font-size: 1.4rem; }
+    .navbar-landing .nav-link { color: rgba(255,255,255,0.85); font-weight: 500; }
+    .navbar-landing .nav-link:hover { color: #fff; }
+    .btn-login { background: rgba(255,255,255,0.2); color: #fff; border-radius: 50px; padding: 8px 24px; font-weight: 600; }
+    .btn-login:hover { background: rgba(255,255,255,0.3); color: #fff; }
+    .stats-section { background: #fff; padding: 60px 0; }
+    .stat-item { text-align: center; }
+    .stat-item h3 { font-size: 2.5rem; font-weight: 800; color: #075e54; }
+    .stat-item p { color: #6c757d; }
+    .testimonial-card {
+      background: #fff; border-radius: 16px; padding: 1.5rem;
+      box-shadow: 0 2px 15px rgba(0,0,0,0.06);
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-landing fixed-top">
+    <div class="container">
+      <a class="navbar-brand" href="/"><i class="fab fa-whatsapp me-2"></i><%= appName %></a>
+      <div class="d-flex gap-2">
+        <a href="/auth/login" class="btn btn-login"><i class="fas fa-sign-in-alt me-1"></i> Login</a>
+        <a href="/auth/register" class="btn btn-login"><i class="fas fa-user-plus me-1"></i> Register</a>
+      </div>
+    </div>
+  </nav>
+
+  <section class="hero" style="padding-top:140px">
+    <div class="container">
+      <h1><i class="fab fa-whatsapp me-2"></i>Embrace WhatsApp Automation</h1>
+      <p>Supercharge your business with automated WhatsApp messaging. Send bulk messages, manage campaigns, and connect with customers seamlessly.</p>
+      <a href="#plans" class="btn btn-light btn-lg px-5 me-2" style="border-radius:50px;font-weight:600">View Plans</a>
+      <a href="https://wa.me/918299854822?text=Hi!%20I%27m%20interested%20in%20WhatsApp%20automation.%20Please%20share%20more%20details." target="_blank" class="btn btn-outline-light btn-lg px-5" style="border-radius:50px;font-weight:600"><i class="fab fa-whatsapp me-1"></i> Talk to Sales</a>
+    </div>
+  </section>
+
+  <section class="py-5">
+    <div class="container">
+      <div class="section-title">
+        <h2>Why Choose Us?</h2>
+        <p>Everything you need to automate WhatsApp at scale</p>
+      </div>
+      <div class="row g-4">
+        <div class="col-md-4"><div class="feature-card"><i class="fas fa-bolt"></i><h5>Bulk Messaging</h5><p class="text-muted mb-0">Send thousands of messages with smart delay to avoid bans.</p></div></div>
+        <div class="col-md-4"><div class="feature-card"><i class="fas fa-qrcode"></i><h5>Easy Connect</h5><p class="text-muted mb-0">Scan QR code from WhatsApp Web — no API keys or extra setup.</p></div></div>
+        <div class="col-md-4"><div class="feature-card"><i class="fas fa-calendar-alt"></i><h5>Schedule Campaigns</h5><p class="text-muted mb-0">Schedule your campaigns and let the system run them automatically.</p></div></div>
+        <div class="col-md-4"><div class="feature-card"><i class="fas fa-image"></i><h5>Media Messages</h5><p class="text-muted mb-0">Send images, videos, documents, and audio messages effortlessly.</p></div></div>
+        <div class="col-md-4"><div class="feature-card"><i class="fas fa-users"></i><h5>Team Management</h5><p class="text-muted mb-0">Add team members and manage permissions for better collaboration.</p></div></div>
+        <div class="col-md-4"><div class="feature-card"><i class="fas fa-chart-line"></i><h5>Detailed Analytics</h5><p class="text-muted mb-0">Track delivery status, read receipts, and campaign performance.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="stats-section">
+    <div class="container">
+      <div class="row g-4">
+        <div class="col-md-3"><div class="stat-item"><h3 class="counter">10K+</h3><p>Messages Sent</p></div></div>
+        <div class="col-md-3"><div class="stat-item"><h3 class="counter">500+</h3><p>Active Users</p></div></div>
+        <div class="col-md-3"><div class="stat-item"><h3 class="counter">99.9%</h3><p>Uptime</p></div></div>
+        <div class="col-md-3"><div class="stat-item"><h3 class="counter">24/7</h3><p>Support</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="plans" class="py-5">
+    <div class="container">
+      <div class="section-title">
+        <h2>Choose Your Plan</h2>
+        <p>Select the plan that fits your business needs</p>
+      </div>
+      <div class="row g-4 justify-content-center">
+        <% (plans || []).forEach(plan => { %>
+          <div class="col-md-4">
+            <div class="plan-card <%= plan.metadata?.highlight ? 'popular' : '' %>">
+              <% if (plan.metadata?.badge) { %><span class="badge-popular"><%= plan.metadata.badge %></span><% } %>
+              <h5 class="fw-bold mb-2"><%= plan.name %></h5>
+              <div class="price">₹<%= plan.price.toLocaleString() %><small>/<%= plan.validity %> days</small></div>
+              <ul class="list-unstyled small">
+                <li><i class="<%= plan.features.whatsappInstances > 0 ? 'fas fa-check-circle text-success' : plan.features.whatsappInstances === -1 ? 'fas fa-infinity text-success' : 'fas fa-times-circle text-danger' %> me-2"></i><% if(plan.features.whatsappInstances === -1){ %>Unlimited Profiles<% } else { %><%= plan.features.whatsappInstances %> Profile(s)<% } %></li>
+                <li><i class="<%= plan.features.dailyMessageLimit > 0 ? 'fas fa-check-circle text-success' : plan.features.dailyMessageLimit === -1 ? 'fas fa-infinity text-success' : 'fas fa-times-circle text-danger' %> me-2"></i><% if(plan.features.dailyMessageLimit === -1){ %>Unlimited Daily<% } else { %><%= plan.features.dailyMessageLimit %> Daily<% } %></li>
+                <li><i class="<%= plan.features.monthlyMessageLimit > 0 ? 'fas fa-check-circle text-success' : plan.features.monthlyMessageLimit === -1 ? 'fas fa-infinity text-success' : 'fas fa-times-circle text-danger' %> me-2"></i><% if(plan.features.monthlyMessageLimit === -1){ %>Unlimited Monthly<% } else { %><%= plan.features.monthlyMessageLimit %> Monthly<% } %></li>
+                <li><i class="<%= plan.features.mediaMessaging ? 'fas fa-check-circle text-success' : 'fas fa-times-circle text-danger' %> me-2"></i>Media Messages</li>
+                <li><i class="<%= plan.features.apiAccess ? 'fas fa-check-circle text-success' : 'fas fa-times-circle text-danger' %> me-2"></i>WhatsApp Business API</li>
+                <li><i class="<%= plan.features.bulkMessaging ? 'fas fa-check-circle text-success' : 'fas fa-times-circle text-danger' %> me-2"></i>Bulk Messaging</li>
+                <li><i class="<%= plan.features.chatbot ? 'fas fa-check-circle text-success' : 'fas fa-times-circle text-danger' %> me-2"></i>Chatbot</li>
+                <li><i class="<%= plan.features.exportData ? 'fas fa-check-circle text-success' : 'fas fa-times-circle text-danger' %> me-2"></i>Excel Import</li>
+                <li><i class="<%= plan.features.dynamicMessaging ? 'fas fa-check-circle text-success' : 'fas fa-times-circle text-danger' %> me-2"></i>Dynamic Messaging</li>
+                <li><i class="<%= (plan.features.outgoingMessages && plan.features.incomingMessages) ? 'fas fa-check-circle text-success' : 'fas fa-times-circle text-danger' %> me-2"></i>In/Out Messages</li>
+              </ul>
+              <button onclick="window.open('https://wa.me/918299854822?text=Hi!%20I%27m%20interested%20in%20the%20<%= encodeURIComponent(plan.name) %>%20plan%20(₹<%= plan.price %>).%20Please%20share%20more%20details.','_blank')" class="btn-whatsapp">
+                <i class="fab fa-whatsapp me-1"></i> Contact on WhatsApp
+              </button>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+  </section>
+
+  <section class="py-5 bg-white">
+    <div class="container">
+      <div class="section-title">
+        <h2>What Our Clients Say</h2>
+      </div>
+      <div class="row g-4">
+        <div class="col-md-4">
+          <div class="testimonial-card">
+            <div class="text-warning mb-2">★★★★★</div>
+            <p class="mb-2">"Amazing platform! We send 5000+ messages daily without any issues. The bulk messaging feature is a game changer."</p>
+            <small class="text-muted">— Rajesh K., E-commerce Business</small>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="testimonial-card">
+            <div class="text-warning mb-2">★★★★★</div>
+            <p class="mb-2">"Very easy to set up and use. Campaign scheduling saved us hours of manual work every week."</p>
+            <small class="text-muted">— Priya S., Real Estate Agency</small>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="testimonial-card">
+            <div class="text-warning mb-2">★★★★★</div>
+            <p class="mb-2">"The API integration was seamless. We connected our CRM in minutes. Highly recommended!"</p>
+            <small class="text-muted">— Amit V., SaaS Company</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="py-5" style="background:linear-gradient(135deg,#075e54,#128c7e);color:#fff;text-align:center">
+    <div class="container">
+      <h2 class="fw-bold mb-3">Ready to Automate Your WhatsApp?</h2>
+      <p class="mb-4" style="opacity:0.9;font-size:1.1rem">Join thousands of businesses using <%= appName %> to grow faster.</p>
+      <a href="https://wa.me/918299854822?text=Hi!%20I%20want%20to%20get%20started%20with%20WhatsApp%20automation." target="_blank" class="btn btn-light btn-lg px-5" style="border-radius:50px;font-weight:600"><i class="fab fa-whatsapp me-1"></i> Contact Sales Now</a>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container">
+      <p class="mb-0">&copy; 2026 <a href="/"><%= appName %></a>. All rights reserved.</p>
+    </div>
+  </footer>
+</body>
+</html>

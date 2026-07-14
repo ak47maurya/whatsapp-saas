@@ -1,0 +1,9 @@
+(node:9404) [MONGOOSE] Warning: Duplicate schema index on {"invoiceNumber":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:9404) [MONGOOSE] Warning: Duplicate schema index on {"key":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+[2026-06-25 18:40:14] [32mINFO[39m: [36mMongoDB connected: localhost[39m
+[2026-06-25 18:40:14] [32mINFO[39m: [36mSocket.IO initialized[39m
+[2026-06-25 18:40:14] [32mINFO[39m: [36mRedis connecting...[39m
+[2026-06-25 18:40:14] [32mINFO[39m: [36mMongoDB connected: localhost[39m
+[2026-06-25 18:40:14] [32mINFO[39m: [36mCron jobs initialized[39m
+[2026-06-25 18:40:14] [31mERROR[39m: [36mUncaught Exception:[39m

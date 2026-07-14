@@ -1,0 +1,85 @@
+<%- include('../partials/header') %>
+<%- include('../partials/sidebar') %>
+<div class="main-content">
+  <%- include('../partials/navbar') %>
+  <div class="content p-7 m-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="mb-0"><i class="fas fa-users text-success me-2"></i>Bulk History</h4>
+      <a href="/messages/bulk-page" class="btn btn-success btn-sm"><i class="fas fa-plus me-1"></i> New Bulk</a>
+    </div>
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <table class="table datatable">
+          <thead><tr><th>Date</th><th>Instance</th><th>Message</th><th>Progress</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="bulkTableBody">
+            <% (bulks || []).forEach(b => { %>
+              <tr id="bulk-<%= b._id %>">
+                <td><%= new Date(b.createdAt).toLocaleString() %></td>
+                <td><%= b.instance?.name || '—' %></td>
+                <td class="text-truncate" style="max-width:200px"><%= b.content?.text || b.messageType || '—' %></td>
+                <td style="min-width:180px">
+                  <div class="d-flex align-items-center gap-2">
+                    <div class="progress flex-grow-1" style="height:8px">
+                      <% const pct = b.totalRecipients > 0 ? Math.round(((b.sentCount || 0) + (b.failedCount || 0)) / b.totalRecipients * 100) : 0; %>
+                      <div class="progress-bar <%= b.status === 'cancelled' ? 'bg-warning' : (b.failedCount > 0 && b.sentCount > 0 ? 'bg-info' : 'bg-success') %>" style="width:<%= pct %>%"></div>
+                    </div>
+                    <small class="text-nowrap"><%= b.sentCount || 0 %>/<%= b.totalRecipients %></small>
+                  </div>
+                  <% if (b.failedCount > 0) { %><small class="text-danger"><%= b.failedCount %> failed</small><% } %>
+                </td>
+                <td>
+                  <% if (b.status === 'pending') { %><span class="badge bg-secondary">Pending</span><% } %>
+                  <% if (b.status === 'processing') { %><span class="badge bg-primary">Processing <i class="fas fa-spinner fa-spin"></i></span><% } %>
+                  <% if (b.status === 'completed') { %><span class="badge bg-success">Completed</span><% } %>
+                  <% if (b.status === 'cancelled') { %><span class="badge bg-warning text-dark">Cancelled</span><% } %>
+                </td>
+                <td nowrap>
+                  <button onclick="viewBulkRecipients('<%= b._id %>')" class="btn btn-sm btn-info" title="View Recipients"><i class="fas fa-list"></i></button>
+                  <% if (b.status === 'pending' || b.status === 'processing') { %>
+                    <button onclick="cancelBulk('<%= b._id %>')" class="btn btn-sm btn-danger" title="Cancel"><i class="fas fa-stop"></i></button>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <%- include('../partials/footer') %>
+</div>
+<script>
+function viewBulkRecipients(id) {
+  Swal.fire({title:'Loading...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
+  fetch('/messages/bulk-status/'+id,{headers:{'Accept':'application/json'}})
+    .then(r=>r.json()).then(d=>{
+      Swal.close();
+      if(!d.success){Swal.fire('Error',d.message,'error');return;}
+      const bulk = d.data.bulk;
+      let html = '<div style="max-height:400px;overflow-y:auto"><table class="table table-sm table-bordered mb-0"><thead><tr><th>#</th><th>Phone</th><th>Status</th><th>Error</th></tr></thead><tbody>';
+      (bulk.recipients || []).forEach((r,i)=>{
+        const statusBadge = r.status === 'sent' ? '<span class="badge bg-success">Sent</span>'
+          : r.status === 'failed' ? '<span class="badge bg-danger">Failed</span>'
+          : '<span class="badge bg-secondary">Pending</span>';
+        html += '<tr><td>'+(i+1)+'</td><td>'+r.phone+'</td><td>'+statusBadge+'</td><td>'+(r.error || '—')+'</td></tr>';
+      });
+      html += '</tbody></table></div>';
+      if(!bulk.recipients?.length) html = '<p class="text-muted">No recipients.</p>';
+      Swal.fire({title:'Recipients ('+(bulk.recipients?.length||0)+')',html,width:700});
+    }).catch(e=>{Swal.close();Swal.fire('Error',e.message,'error');});
+}
+function cancelBulk(id) {
+  Swal.fire({title:'Cancel this bulk?',icon:'warning',showCancelButton:true}).then(r=>{
+    if(!r.isConfirmed) return;
+    fetch('/messages/bulk-cancel/'+id,{method:'POST',headers:{'x-csrf-token':csrfToken,'Accept':'application/json'}}).then(r=>r.json()).then(d=>{
+      if(d.success){Swal.fire('Cancelled','','success').then(()=>location.reload());}
+      else Swal.fire('Error',d.message,'error');
+    });
+  });
+}
+// Auto-refresh page when any bulk is still processing
+(function autoRefresh(){
+  const processing = document.querySelector('#bulkTableBody .badge.bg-primary');
+  if(processing) setTimeout(()=>location.reload(), 5000);
+})();
+</script>

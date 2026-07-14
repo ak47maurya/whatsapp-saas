@@ -1,0 +1,28 @@
+<%- include('partials/header') %>
+<div class="wrapper">
+  <% if (isAuthenticated) { %>
+    <%- include('partials/sidebar') %>
+  <% } %>
+  <div class="main-content <%= isAuthenticated ? '' : 'full-width' %>">
+    <% if (isAuthenticated) { %>
+      <%- include('partials/navbar') %>
+    <% } %>
+    <div class="content p-7 m-4">
+      <% if (success) { %>
+        <div class="alert alert-success alert-dismissible fade show">
+          <%= success %>
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      <% } %>
+      <% if (error) { %>
+        <div class="alert alert-danger alert-dismissible fade show">
+          <%= error %>
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      <% } %>
+      <%- body %>
+    </div>
+    <%- include('partials/footer') %>
+  </div>
+</div>
+<%- include('partials/footer') %>

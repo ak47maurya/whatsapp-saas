@@ -1,0 +1,191 @@
+<%- include('../partials/header') %>
+<%- include('../partials/sidebar') %>
+<div class="main-content">
+  <%- include('../partials/navbar') %>
+  <div class="content p-7 m-4">
+    <% if (locals.success) { %><div class="alert alert-success alert-dismissible fade show"><%= success %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div><% } %>
+    <% if (locals.error) { %><div class="alert alert-danger alert-dismissible fade show"><%= error %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div><% } %>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="mb-0">WhatsApp Instances</h4>
+      <div>
+        <a href="/instances/new" class="btn btn-success"><i class="fas fa-plus"></i> New Instance</a>
+      </div>
+    </div>
+
+    <% if (instances.length === 0) { %>
+      <div class="text-center py-5"><i class="fab fa-whatsapp text-muted" style="font-size:4rem"></i><h5 class="mt-3">No Instances Yet</h5><p class="text-muted">Create your first WhatsApp instance to get started.</p></div>
+    <% } else { %>
+      <div class="row g-3">
+        <% instances.forEach(inst => { %>
+          <div class="col-md-6 col-lg-4">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                  <h5 class="card-title mb-0"><%= inst.name %></h5>
+                  <code class="small text-muted" style="font-size:11px"><%= inst._id %></code>
+                  <span class="badge bg-<%= inst.status === 'connected' ? 'success' : inst.status === 'qr_ready' ? 'info' : inst.status === 'connecting' ? 'warning' : 'secondary' %>"><%= inst.status %></span>
+                </div>
+                <p class="card-text small text-muted"><i class="fas fa-phone me-1"></i><%= inst.phone || 'Not connected' %></p>
+                <p class="card-text small text-muted"><i class="fas fa-clock me-1"></i><%= inst.lastConnected ? new Date(inst.lastConnected).toLocaleString() : 'Never connected' %></p>
+                <div class="mt-2 small text-muted">
+                  <% const d = inst.settings?.messageDelay; %>
+                  <i class="fas fa-clock me-1"></i>Delay:
+                  <%= d?.type === 'random' ? (d?.minDelay||1000)+'–'+(d?.maxDelay||5000)+'ms (random)' : (d?.fixedDelay||2000)+'ms (fixed)' %>
+                </div>
+                <div class="mt-3 d-flex gap-1 flex-wrap">
+                  <% if (inst.status === 'disconnected' || inst.status === 'error') { %>
+                    <a href="/instances/<%= inst._id %>/connect" class="btn btn-sm btn-success"><i class="fas fa-qrcode"></i> Connect QR</a>
+                  <% } %>
+                  <% if (inst.status === 'connecting') { %>
+                    <button onclick="retryConnection('<%= inst._id %>')" class="btn btn-sm btn-warning"><i class="fas fa-sync"></i> Retry Connection</button>
+                  <% } %>
+                  <% if (inst.status === 'qr_ready') { %>
+                    <a href="/instances/<%= inst._id %>/connect" class="btn btn-sm btn-info"><i class="fas fa-qrcode"></i> Show QR</a>
+                  <% } %>
+                  <% if (inst.status === 'connected') { %>
+                    <span class="badge bg-success p-2"><i class="fas fa-check-circle"></i> Connected</span>
+                    <button onclick="logoutInstance('<%= inst._id %>')" class="btn btn-sm btn-danger"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                  <% } %>
+                  <button onclick="openDelayConfig('<%= inst._id %>')" class="btn btn-sm btn-outline-secondary" title="Message Delay"><i class="fas fa-clock"></i></button>
+                  <button onclick="deleteInstance('<%= inst._id %>')" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+                </div>
+              </div>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    <% } %>
+
+    <div class="card border-0 shadow-sm mt-4">
+      <div class="card-body">
+        <h5>How to connect WhatsApp</h5>
+        <ol class="mb-0">
+          <li>Click <strong>"New Instance"</strong> and give it a name</li>
+          <li>After creation, click <strong>"Connect QR"</strong> on the instance card</li>
+          <li>Open <strong>WhatsApp</strong> on your phone → Menu (⋮) → Linked Devices → Link a Device</li>
+          <li>Scan the QR code shown on screen</li>
+          <li>Status will change to <strong>"Connected"</strong> automatically</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+  <%- include('../partials/footer') %>
+</div>
+
+<div class="modal fade" id="delayModal"><div class="modal-dialog modal-sm"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title">Message Delay</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <form id="delayForm">
+    <div class="modal-body">
+      <input type="hidden" id="delay_instId">
+      <p class="small text-muted">Delay between each message sent via API queue.</p>
+      <div class="mb-3">
+        <label class="form-label">Delay Type</label>
+        <select id="delay_type" class="form-select" onchange="toggleDelayType()">
+          <option value="fixed">Fixed</option>
+          <option value="random">Random</option>
+        </select>
+      </div>
+      <div id="delay_fixedGroup">
+        <div class="mb-3">
+          <label class="form-label">Delay (ms)</label>
+          <input type="number" id="delay_fixed" class="form-control" value="2000" min="500" step="500">
+        </div>
+      </div>
+      <div id="delay_randomGroup" style="display:none">
+        <div class="mb-3">
+          <label class="form-label">Min Delay (ms)</label>
+          <input type="number" id="delay_min" class="form-control" value="1000" min="500" step="500">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Max Delay (ms)</label>
+          <input type="number" id="delay_max" class="form-control" value="5000" min="1000" step="500">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+      <button type="submit" class="btn btn-success">Save</button>
+    </div>
+  </form>
+</div></div></div>
+
+<script>
+const socket = io({ auth: { token: '<%= token || "" %>' } });
+socket.on('instance:qr', (data) => { if(data.qr) Swal.fire({ title:'Scan QR', imageUrl: data.qr, imageWidth:300, text:'Scan with WhatsApp → Linked Devices' }); });
+socket.on('instance:connected', () => { location.reload(); });
+socket.on('instance:disconnected', () => { location.reload(); });
+
+function retryConnection(id) {
+  Swal.fire({ title:'Reconnecting...', text:'Please wait while we try to reconnect', allowOutsideClick:false, didOpen:()=>Swal.showLoading() });
+  api('/instances/'+id+'/reconnect', {method:'POST'})
+    .then(r=>r.json())
+    .then(d=>{
+      if(!d.success) { Swal.fire('Error', d.message, 'error'); return; }
+      const inst = d.data.instance;
+      if (inst.status === 'connected') {
+        Swal.fire({ icon:'success', title:'Connected!', timer:1500, showConfirmButton:false });
+        setTimeout(()=>location.reload(), 1500);
+      } else if (inst.status === 'qr_ready' && inst.qrCode?.code) {
+        Swal.fire({ title:'Scan QR', imageUrl: inst.qrCode.code, imageWidth:300, text:'Scan with WhatsApp → Linked Devices' });
+        setTimeout(()=>location.reload(), 5000);
+      } else {
+        Swal.fire({ icon:'info', title:'Status: '+inst.status, text:'Check your instance page for updates' });
+        location.reload();
+      }
+    })
+    .catch(e => Swal.fire('Error', e.message, 'error'));
+}
+
+function logoutInstance(id) {
+  Swal.fire({ title:'Logout?', text:'WhatsApp session will be cleared!', icon:'warning', showCancelButton:true })
+    .then(r => { if(r.isConfirmed) api('/instances/'+id+'/logout', {method:'POST'}).then(r=>r.json()).then(d=>{if(d.success)location.reload();else Swal.fire('Error',d.message,'error');}); });
+}
+
+function deleteInstance(id) {
+  Swal.fire({ title:'Delete?', text:'This cannot be undone!', icon:'warning', showCancelButton:true })
+    .then(r => { if(r.isConfirmed) api('/instances/'+id, {method:'DELETE'}).then(r=>r.json()).then(d=>{if(d.success)location.reload();else Swal.fire('Error',d.message,'error');}); });
+}
+
+function openDelayConfig(id) {
+  api('/instances/'+id+'/status').then(r=>r.json()).then(d=>{
+    if(!d.success){Swal.fire('Error',d.message,'error');return;}
+    const inst = d.data;
+    const delay = inst.settings?.messageDelay || {};
+    document.getElementById('delay_instId').value = id;
+    document.getElementById('delay_type').value = delay.type || 'fixed';
+    document.getElementById('delay_fixed').value = delay.fixedDelay || 2000;
+    document.getElementById('delay_min').value = delay.minDelay || 1000;
+    document.getElementById('delay_max').value = delay.maxDelay || 5000;
+    toggleDelayType();
+    new bootstrap.Modal(document.getElementById('delayModal')).show();
+  });
+}
+
+function toggleDelayType() {
+  const t = document.getElementById('delay_type').value;
+  document.getElementById('delay_fixedGroup').style.display = t === 'fixed' ? 'block' : 'none';
+  document.getElementById('delay_randomGroup').style.display = t === 'random' ? 'block' : 'none';
+}
+
+document.getElementById('delayForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const id = document.getElementById('delay_instId').value;
+  const data = {
+    messageDelay: {
+      type: document.getElementById('delay_type').value,
+      fixedDelay: parseInt(document.getElementById('delay_fixed').value) || 2000,
+      minDelay: parseInt(document.getElementById('delay_min').value) || 1000,
+      maxDelay: parseInt(document.getElementById('delay_max').value) || 5000,
+    },
+  };
+  api('/instances/'+id+'/settings', { method:'PUT', body:JSON.stringify(data) }).then(r=>r.json()).then(d=>{
+      if(d.success) {
+        bootstrap.Modal.getInstance(document.getElementById('delayModal')).hide();
+        Swal.fire('Done','Delay updated','success').then(()=>location.reload());
+      } else {
+        Swal.fire('Error',d.message,'error');
+      }
+    }).catch(e=>Swal.fire('Error',e.message,'error'));
+});
+</script>

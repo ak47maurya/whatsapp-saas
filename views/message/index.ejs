@@ -1,0 +1,232 @@
+<%- include('../partials/header') %>
+<%- include('../partials/sidebar') %>
+<% const hasFeature = (f) => { if(!user) return false; if(user.role==='super_admin') return true; const s=user._subscription; if(!s||!s.features) return false; if(s.features[f]===-1) return true; return !!s.features[f]; }; const qs = (o) => { const p=new URLSearchParams(); Object.entries({...query, ...o}).forEach(([k,v])=>v?p.set(k,v):0); return '?'+p.toString(); }; %>
+<style>
+.table-wrap { max-height: 65vh; overflow-y: auto; }
+.table-wrap thead th { position: sticky; top: 0; background: #fff; z-index: 2; border-bottom: 2px solid #dee2e6; }
+.table-wrap tbody tr:hover { background: #f8f9fa; }
+</style>
+<div class="main-content">
+  <%- include('../partials/navbar') %>
+  <div class="content p-7 m-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="mb-0">Messages</h4>
+      <div>
+        <button class="btn btn-outline-secondary me-2" onclick="exportCSV()"><i class="fas fa-download"></i> Export</button>
+        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#sendModal"><i class="fas fa-paper-plane"></i> Send Message</button>
+      </div>
+    </div>
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <ul class="nav nav-tabs card-header-tabs mb-3">
+          <li class="nav-item"><a class="nav-link <%= !filters.direction ? 'active' : '' %>" href="<%= qs({direction:'', page:1}) %>">All</a></li>
+          <% if (hasFeature('outgoingMessages')) { %><li class="nav-item"><a class="nav-link <%= filters.direction==='outgoing' ? 'active' : '' %>" href="<%= qs({direction:'outgoing', page:1}) %>"><i class="fas fa-arrow-up me-1"></i>Sent</a></li><% } %>
+          <% if (hasFeature('incomingMessages')) { %><li class="nav-item"><a class="nav-link <%= filters.direction==='incoming' ? 'active' : '' %>" href="<%= qs({direction:'incoming', page:1}) %>"><i class="fas fa-arrow-down me-1"></i>Received</a></li><% } %>
+        </ul>
+        <form class="row g-2">
+          <div class="col-auto"><select name="instanceId" class="form-select" onchange="this.form.submit()"><option value="">All Instances</option><% (instances || []).forEach(i => { %><option value="<%= i._id %>" <%= filters.instanceId === String(i._id) ? 'selected' : '' %>><%= i.name %></option><% }) %></select></div>
+          <div class="col-auto"><select name="status" class="form-select" onchange="this.form.submit()"><option value="">All Status</option><option value="queued" <%= filters.status==='queued'?'selected':'' %>>Queued</option><option value="sent" <%= filters.status==='sent'?'selected':'' %>>Sent</option><option value="delivered" <%= filters.status==='delivered'?'selected':'' %>>Delivered</option><option value="failed" <%= filters.status==='failed'?'selected':'' %>>Failed</option><option value="received" <%= filters.status==='received'?'selected':'' %>>Received</option><option value="cancelled" <%= filters.status==='cancelled'?'selected':'' %>>Cancelled</option></select></div>
+          <div class="col"><input type="search" name="search" class="form-control" placeholder="Search..." value="<%= filters.search || '' %>"></div>
+          <div class="col-auto"><button class="btn btn-outline-primary"><i class="fas fa-search"></i></button></div>
+        </form>
+      </div>
+    </div>
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-0">
+        <div class="table-wrap">
+          <table class="table table-hover mb-0" id="msgTable">
+            <thead><tr><th>Direction</th><th>From</th><th>To</th><th>Type</th><th>Content</th><th>Status</th><th>Instance</th><th>Date</th><th>Action</th></tr></thead>
+            <tbody>
+              <% (messages || []).forEach(m => { %>
+                <tr>
+                  <td><span class="badge bg-<%= m.direction==='outgoing'?'primary':'secondary' %>" style="font-size:10px"><i class="fas fa-<%= m.direction==='outgoing'?'arrow-up':'arrow-down' %> me-1"></i><%= m.direction %></span></td>
+                  <td class="text-truncate" style="max-width:120px"><%= m.from?.split('@')[0]?.split(':')[0] || m.from || '—' %></td>
+                  <td class="text-truncate" style="max-width:120px"><%= m.to?.split('@')[0]?.split(':')[0] || m.to || '—' %></td>
+                  <td><span class="badge bg-secondary"><%= m.messageType %></span></td>
+                  <td class="text-truncate" style="max-width:180px"><% if (['image','video','audio','document','sticker'].includes(m.messageType)) { %><a href="<%= m.content?.mediaUrl || '#' %>" target="_blank" class="text-decoration-none"><i class="fas fa-<%= m.messageType==='image'?'image':m.messageType==='video'?'video':m.messageType==='audio'?'microphone':m.messageType==='document'?'file':'sticker' %> me-1"></i><%= m.content?.caption || m.content?.fileName || m.content?.mediaUrl || '('+m.messageType+')' %></a><% } else { %><%= m.content?.text || m.content?.caption || '('+m.messageType+')' %><% } %></td>
+                  <td><span class="badge bg-<%= m.status === 'queued' ? 'warning text-dark' : m.status === 'sent' ? 'info' : m.status === 'delivered' ? 'primary' : m.status === 'read' ? 'success' : m.status === 'failed' ? 'danger' : m.status === 'cancelled' ? 'secondary' : m.status === 'received' ? 'secondary' : 'secondary' %>"><%= m.status %></span></td>
+                  <td class="text-truncate" style="max-width:100px"><%= m.instance?.name || '—' %></td>
+                  <td><%= new Date(m.createdAt).toLocaleString() %></td>
+                  <td nowrap>
+                    <% if (m.status === 'queued') { %>
+                      <button onclick="cancelMsg('<%= m._id %>')" class="btn btn-sm btn-outline-danger" title="Cancel"><i class="fas fa-ban"></i></button>
+                    <% } else if (m.status === 'failed' || m.status === 'cancelled') { %>
+                      <button onclick="retryMsg('<%= m._id %>')" class="btn btn-sm btn-outline-success" title="Retry"><i class="fas fa-redo"></i></button>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <% if (total > 0) { %>
+        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-top">
+          <small class="text-muted">Showing <%= Math.min((page-1)*limit+1, total) %>–<%= Math.min(page*limit, total) %> of <%= total %></small>
+          <% const totalPages = Math.ceil(total/limit); if (totalPages > 1) { %>
+          <nav><ul class="pagination pagination-sm mb-0">
+            <li class="page-item <%= page<=1?'disabled':'' %>"><a class="page-link" href="<%= qs({page:page-1}) %>">Prev</a></li>
+            <% for(let p=Math.max(1,page-2); p<=Math.min(totalPages, page+2); p++) { %>
+              <li class="page-item <%= p===page?'active':'' %>"><a class="page-link" href="<%= qs({page:p}) %>"><%= p %></a></li>
+            <% } %>
+            <li class="page-item <%= page>=totalPages?'disabled':'' %>"><a class="page-link" href="<%= qs({page:page+1}) %>">Next</a></li>
+          </ul></nav>
+          <% } %>
+        </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+  <%- include('../partials/footer') %>
+</div>
+
+<div class="modal fade" id="sendModal"><div class="modal-dialog modal-lg"><div class="modal-content">
+  <div class="modal-header"><h5>Send Message</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+  <form id="sendForm">
+    <div class="modal-body">
+      <div class="row mb-3">
+        <div class="col"><label class="form-label">Instance</label>
+          <select name="instanceId" class="form-select" required>
+            <% (instances || []).filter(i => i.status === 'connected').forEach(i => { %><option value="<%= i._id %>"><%= i.name %></option><% }) %>
+          </select>
+        </div>
+        <div class="col"><label class="form-label">To (Phone or Group JID)</label><input type="text" name="to" class="form-control" placeholder="2348012345678 or xxxx@g.us" required></div>
+      </div>
+
+      <div class="mb-3"><label class="form-label">Message Type</label>
+        <select name="type" class="form-select" id="msgType" onchange="toggleMsgFields()">
+          <option value="text">Text</option>
+          <option value="image">Image</option>
+          <option value="video">Video</option>
+          <option value="audio">Audio</option>
+          <option value="document">Document</option>
+          <option value="sticker">Sticker</option>
+          <option value="location">Location</option>
+          <option value="contact">Contact</option>
+        </select>
+      </div>
+
+      <div id="fields-text" class="msg-fields">
+        <div class="mb-3"><label class="form-label">Message</label><textarea name="text" class="form-control" rows="3"></textarea></div>
+      </div>
+
+      <div id="fields-image" class="msg-fields d-none">
+        <div class="mb-3"><label class="form-label">Image URL or Upload</label>
+          <input name="mediaUrl" class="form-control mb-2" placeholder="https://example.com/image.jpg">
+          <input name="media" type="file" class="form-control" accept="image/*">
+        </div>
+        <div class="mb-3"><label class="form-label">Caption</label><textarea name="caption" class="form-control" rows="2"></textarea></div>
+      </div>
+
+      <div id="fields-video" class="msg-fields d-none">
+        <div class="mb-3"><label class="form-label">Video URL or Upload</label>
+          <input name="mediaUrl" class="form-control mb-2" placeholder="https://example.com/video.mp4">
+          <input name="media" type="file" class="form-control" accept="video/*">
+        </div>
+        <div class="mb-3"><label class="form-label">Caption</label><textarea name="caption" class="form-control" rows="2"></textarea></div>
+      </div>
+
+      <div id="fields-audio" class="msg-fields d-none">
+        <div class="mb-3"><label class="form-label">Audio URL or Upload</label>
+          <input name="mediaUrl" class="form-control mb-2" placeholder="https://example.com/audio.mp3">
+          <input name="media" type="file" class="form-control" accept="audio/*">
+        </div>
+      </div>
+
+      <div id="fields-document" class="msg-fields d-none">
+        <div class="mb-3"><label class="form-label">Document URL or Upload</label>
+          <input name="mediaUrl" class="form-control mb-2" placeholder="https://example.com/doc.pdf">
+          <input name="media" type="file" class="form-control">
+        </div>
+        <div class="row mb-3">
+          <div class="col"><label class="form-label">File Name</label><input name="fileName" class="form-control" placeholder="document.pdf"></div>
+          <div class="col"><label class="form-label">MIME Type</label><input name="mimeType" class="form-control" placeholder="application/pdf"></div>
+        </div>
+      </div>
+
+      <div id="fields-sticker" class="msg-fields d-none">
+        <div class="mb-3"><label class="form-label">Sticker URL (WebP) or Upload</label>
+          <input name="mediaUrl" class="form-control mb-2" placeholder="https://example.com/sticker.webp">
+          <input name="media" type="file" class="form-control" accept="image/webp,.webp">
+        </div>
+      </div>
+
+      <div id="fields-location" class="msg-fields d-none">
+        <div class="row mb-3">
+          <div class="col"><label class="form-label">Latitude</label><input name="latitude" type="number" step="any" class="form-control" placeholder="28.6139"></div>
+          <div class="col"><label class="form-label">Longitude</label><input name="longitude" type="number" step="any" class="form-control" placeholder="77.2090"></div>
+        </div>
+      </div>
+
+      <div id="fields-contact" class="msg-fields d-none">
+        <div class="row mb-3">
+          <div class="col"><label class="form-label">Contact Name</label><input name="contactName" class="form-control" placeholder="John Doe"></div>
+          <div class="col"><label class="form-label">Contact Phone</label><input name="contactPhone" class="form-control" placeholder="2348012345678"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="submit" class="btn btn-success"><i class="fas fa-paper-plane"></i> Send</button>
+    </div>
+  </form>
+</div></div></div>
+
+<script>
+function toggleMsgFields() {
+  const t = document.getElementById('msgType').value;
+  document.querySelectorAll('.msg-fields').forEach(el => el.classList.add('d-none'));
+  const target = document.getElementById('fields-' + t);
+  if (target) target.classList.remove('d-none');
+}
+
+document.getElementById('sendForm')?.addEventListener('submit', function(e) {
+  e.preventDefault();
+  const type = document.getElementById('msgType').value;
+  const formData = new FormData();
+  const form = document.getElementById('sendForm');
+  formData.append('instanceId', form.querySelector('[name=instanceId]').value);
+  formData.append('to', form.querySelector('[name=to]').value);
+  formData.append('type', type);
+  form.querySelectorAll('#fields-'+type+' input, #fields-'+type+' textarea').forEach(el => {
+    if (el.type === 'file') {
+      if (el.files[0]) formData.append(el.name, el.files[0]);
+    } else {
+      formData.append(el.name, el.value);
+    }
+  });
+  fetch('/messages/send', { method:'POST', headers:{'x-csrf-token':csrfToken,'Accept':'application/json'}, body: formData })
+    .then(r=>r.json()).then(d=>{
+      if(d.success) { Swal.fire('Sent!','Message sent','success'); $('#sendModal').modal('hide'); location.reload(); }
+      else Swal.fire('Error',d.message,'error');
+    }).catch(e => Swal.fire('Error','Network error: '+e.message,'error'));
+});
+
+function exportCSV() {
+  const params = new URLSearchParams(window.location.search);
+  params.set('export', 'csv');
+  window.location.href = '/messages/export?' + params.toString();
+}
+
+function cancelMsg(id) {
+  Swal.fire({ title:'Cancel this message?', icon:'warning', showCancelButton:true })
+    .then(r => {
+      if(!r.isConfirmed) return;
+      fetch('/messages/'+id+'/cancel', { method:'POST', headers:{'x-csrf-token':csrfToken,'Accept':'application/json'} })
+        .then(r=>r.json()).then(d=>{
+          if(d.success) Swal.fire('Cancelled','','success').then(()=>location.reload());
+          else Swal.fire('Error',d.message,'error');
+        }).catch(e=>Swal.fire('Error',e.message,'error'));
+    });
+}
+
+function retryMsg(id) {
+  Swal.fire({ title:'Retry this message?', icon:'question', showCancelButton:true })
+    .then(r => {
+      if(!r.isConfirmed) return;
+      fetch('/messages/'+id+'/retry', { method:'POST', headers:{'x-csrf-token':csrfToken,'Accept':'application/json'} })
+        .then(r=>r.json()).then(d=>{
+          if(d.success) Swal.fire('Queued','Message will be sent','success').then(()=>location.reload());
+          else Swal.fire('Error',d.message,'error');
+        }).catch(e=>Swal.fire('Error',e.message,'error'));
+    });
+}
+</script>

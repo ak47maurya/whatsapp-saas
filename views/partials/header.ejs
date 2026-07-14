@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="<%= user?.settings?.darkMode ? 'dark' : 'light' %>">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %> - <%= appName %></title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@700&display=swap" rel="stylesheet">
+  <link href="/css/style.css" rel="stylesheet">
+  <meta name="csrf-token" content="<%= csrfToken || '' %>">
+  <script>const csrfToken=document.querySelector('meta[name="csrf-token"]')?.content||'';const api=(url,opts={})=>fetch(url,{...opts,headers:{...opts.headers,'x-csrf-token':csrfToken,'Content-Type':opts.headers?.['Content-Type']||'application/json','X-Requested-With':'XMLHttpRequest','Accept':'application/json'}});</script>
+</head>
+<body>
+<% if (typeof success !== 'undefined' && success) { %>
+  <div class="alert alert-success alert-dismissible fade show m-0 rounded-0" role="alert" style="position:fixed;top:0;left:0;right:0;z-index:9999">
+    <%= success %>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+<% } %>
+<% if (typeof error !== 'undefined' && error) { %>
+  <div class="alert alert-danger alert-dismissible fade show m-0 rounded-0" role="alert" style="position:fixed;top:0;left:0;right:0;z-index:9999">
+    <%= error %>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+<% } %>

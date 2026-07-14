@@ -1,0 +1,225 @@
+<%- include('../partials/header') %>
+<%- include('../partials/sidebar') %>
+<div class="main-content">
+  <%- include('../partials/navbar') %>
+  <div class="content p-7 m-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="mb-0"><i class="fas fa-tag text-success me-2"></i>Dynamic Messaging</h4>
+      <button class="btn btn-success" onclick="openCreateTemplate()"><i class="fas fa-plus"></i> New Template</button>
+    </div>
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <p class="text-muted mb-0"><i class="fas fa-info-circle me-1"></i> Create a template with <code>{{variable}}</code> placeholders, upload an Excel file with matching column headers, then send personalized messages via queue.</p>
+      </div>
+    </div>
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light"><tr><th>Name</th><th>Template</th><th>Instance</th><th>Delay</th><th>Contacts</th><th>Sent</th><th>Failed</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="dmTableBody">
+              <% (messages || []).forEach(m => { %>
+              <tr id="dm-<%= m._id %>">
+                <td><strong><%= m.name %></strong></td>
+                <td class="text-truncate" style="max-width:200px"><code><%= m.template %></code></td>
+                <td><%= m.instance?.name || '—' %></td>
+                <td><%= m.delay?.type === 'random' ? (m.delay.min+'–'+m.delay.max+'ms') : ((m.delay?.value || 2000)+'ms') %></td>
+                <td><%= m.totalContacts || m.contacts?.length || 0 %></td>
+                <td><%= m.sentCount || 0 %></td>
+                <td><%= m.failedCount || 0 %></td>
+                <td>
+                  <% if (m.status === 'draft') { %><span class="badge bg-secondary">Draft</span><% } %>
+                  <% if (m.status === 'pending') { %><span class="badge bg-primary">Pending</span><% } %>
+                  <% if (m.status === 'processing') { %><span class="badge bg-primary">Processing <i class="fas fa-spinner fa-spin"></i></span><% } %>
+                  <% if (m.status === 'completed') { %><span class="badge bg-success">Completed</span><% } %>
+                  <% if (m.status === 'cancelled') { %><span class="badge bg-warning text-dark">Cancelled</span><% } %>
+                  <% if (m.status === 'completed' || m.status === 'cancelled') { %>
+                    <button onclick="duplicateDm('<%= m._id %>')" class="btn btn-sm btn-outline-primary ms-1" title="Use Again"><i class="fas fa-copy"></i></button>
+                  <% } %>
+                </td>
+                <td nowrap>
+                  <% if (m.status === 'draft') { %>
+                    <button onclick="uploadContacts('<%= m._id %>')" class="btn btn-sm btn-outline-primary" title="Upload Contacts"><i class="fas fa-upload"></i></button>
+                    <button onclick="sendDm('<%= m._id %>')" class="btn btn-sm btn-success" title="Send"><i class="fas fa-paper-plane"></i></button>
+                    <button onclick="deleteMsg('<%= m._id %>')" class="btn btn-sm btn-danger" title="Delete"><i class="fas fa-trash"></i></button>
+                  <% } else { %>
+                    <button onclick="viewDmStatus('<%= m._id %>')" class="btn btn-sm btn-info" title="View Status"><i class="fas fa-list"></i></button>
+                    <% if (m.status === 'processing' || m.status === 'pending') { %>
+                      <button onclick="cancelDm('<%= m._id %>')" class="btn btn-sm btn-danger" title="Cancel"><i class="fas fa-stop"></i></button>
+                    <% } %>
+                  <% } %>
+                </td>
+              </tr>
+              <% }) %>
+              <% if (!messages || messages.length === 0) { %><tr><td colspan="9" class="text-center py-4 text-muted">No templates yet.</td></tr><% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <%- include('../partials/footer') %>
+</div>
+
+<div class="modal fade" id="dmCreateModal"><div class="modal-dialog modal-lg"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title">New Dynamic Template</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <form id="dmCreateForm">
+    <div class="modal-body">
+      <div class="mb-3">
+        <label class="form-label">Template Name</label>
+        <input type="text" id="dm_name" class="form-control" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Instance</label>
+        <select id="dm_inst" class="form-select" required>
+          <option value="">Select Instance</option>
+          <% (instances || []).forEach(i => { %><option value="<%= i._id %>"><%= i.name %><%= i.phone ? ' ('+i.phone+')' : '' %></option><% }) %>
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Template</label>
+        <textarea id="dm_tpl" class="form-control" placeholder="e.g. Hello {{name}}, your score is {{score}}" rows="3"></textarea>
+        <div class="form-text">Use <code>{{VariableName}}</code> placeholders. Upload Excel later with matching column headers.</div>
+      </div>
+      <div class="row mb-3">
+        <div class="col-4">
+          <label class="form-label">Delay Type</label>
+          <select id="dm_delayType" class="form-select" onchange="toggleDmDelay2()">
+            <option value="fixed">Fixed</option>
+            <option value="random">Random</option>
+          </select>
+        </div>
+        <div class="col-4" id="dm_fixedDelayGroup2">
+          <label class="form-label">Delay (ms)</label>
+          <input type="number" id="dm_fixedDelay" class="form-control" value="2000" min="500" step="500">
+        </div>
+        <div class="col-4" id="dm_randomDelayGroup2" style="display:none">
+          <label class="form-label">Min – Max (ms)</label>
+          <div class="input-group">
+            <input type="number" id="dm_minDelay" class="form-control" value="1000" min="500" step="500" placeholder="Min">
+            <input type="number" id="dm_maxDelay" class="form-control" value="5000" min="1000" step="500" placeholder="Max">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+      <button type="submit" class="btn btn-success">Create</button>
+    </div>
+  </form>
+</div></div></div>
+
+<script>
+function openCreateTemplate() {
+  document.getElementById('dmCreateForm').reset();
+  const modal = new bootstrap.Modal(document.getElementById('dmCreateModal'));
+  modal.show();
+}
+
+document.getElementById('dmCreateForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const data = {
+    name: document.getElementById('dm_name').value,
+    instance: document.getElementById('dm_inst').value,
+    template: document.getElementById('dm_tpl').value,
+    delayType: document.getElementById('dm_delayType').value,
+    fixedDelay: document.getElementById('dm_fixedDelay').value,
+    minDelay: document.getElementById('dm_minDelay').value,
+    maxDelay: document.getElementById('dm_maxDelay').value,
+  };
+  if (!data.name || !data.template) { Swal.fire('Error','Name and template required','error'); return; }
+  fetch('/dynamic-messaging', { method:'POST', headers:{'x-csrf-token':csrfToken,'Content-Type':'application/json','Accept':'application/json'}, body:JSON.stringify(data) })
+    .then(r=>r.json()).then(d=>{
+      if(d.success) {
+        bootstrap.Modal.getInstance(document.getElementById('dmCreateModal')).hide();
+        Swal.fire('Done','Template created','success').then(()=>location.reload());
+      } else {
+        Swal.fire('Error',d.message,'error');
+      }
+    }).catch(e=>Swal.fire('Error',e.message,'error'));
+});
+
+function toggleDmDelay2() {
+  const t = document.getElementById('dm_delayType').value;
+  document.getElementById('dm_fixedDelayGroup2').style.display = t === 'fixed' ? 'block' : 'none';
+  document.getElementById('dm_randomDelayGroup2').style.display = t === 'random' ? 'block' : 'none';
+}
+
+function uploadContacts(id) {
+  Swal.fire({
+    title: 'Upload Contacts',
+    html: `<div class="small text-muted mb-2">Excel (.xlsx/.xls/.csv) with columns: <b>phone</b> + variable columns matching template placeholders.</div><input type="file" id="dmFile" class="form-control" accept=".xlsx,.xls,.csv">`,
+    showCancelButton: true,
+    confirmButtonText: 'Upload',
+    preConfirm: () => {
+      const file = document.getElementById('dmFile').files[0];
+      if (!file) { Swal.showValidationMessage('Select a file'); return false; }
+      const fd = new FormData();
+      fd.append('file', file);
+      return fetch('/dynamic-messaging/'+id+'/upload', { method:'POST', headers:{'x-csrf-token':csrfToken,'Accept':'application/json'}, body:fd }).then(r=>r.json()).then(d=>{ if(!d.success) { Swal.showValidationMessage(d.message); return false; } return d; });
+    }
+  }).then(r => { if(r.isConfirmed && r.value?.success) { Swal.fire('Done', r.value.message, 'success').then(()=>location.reload()); } });
+}
+
+function sendDm(id) {
+  Swal.fire({title:'Send now?',text:'Messages will be queued and sent one-by-one with delay.',icon:'question',showCancelButton:true,confirmButtonText:'Send'}).then(r=>{
+    if(!r.isConfirmed) return;
+    Swal.fire({title:'Sending...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
+    fetch('/dynamic-messaging/'+id+'/send',{method:'POST',headers:{'x-csrf-token':csrfToken,'Accept':'application/json'}}).then(r=>r.json()).then(d=>{
+      Swal.close();
+      if(d.success) { Swal.fire('Queued',d.message,'success').then(()=>location.reload()); }
+      else { Swal.fire('Error',d.message,'error'); }
+    });
+  });
+}
+
+function cancelDm(id) {
+  Swal.fire({title:'Cancel sending?',icon:'warning',showCancelButton:true}).then(r=>{
+    if(!r.isConfirmed) return;
+    fetch('/dynamic-messaging/'+id+'/cancel',{method:'POST',headers:{'x-csrf-token':csrfToken,'Accept':'application/json'}}).then(r=>r.json()).then(d=>{
+      if(d.success) Swal.fire('Cancelled','','success').then(()=>location.reload());
+      else Swal.fire('Error',d.message,'error');
+    });
+  });
+}
+
+function viewDmStatus(id) {
+  Swal.fire({title:'Loading...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
+  fetch('/dynamic-messaging/'+id+'/preview',{headers:{'Accept':'application/json'}})
+    .then(r=>r.json()).then(d=>{
+      Swal.close();
+      if(!d.success){Swal.fire('Error',d.message,'error');return;}
+      const data = d.data;
+      let html = '<div style="max-height:400px;overflow-y:auto"><table class="table table-sm table-bordered mb-0"><thead><tr><th>#</th><th>Phone</th><th>Preview</th><th>Status</th></tr></thead><tbody>';
+      (data.previews || []).forEach((p,i)=>{
+        const status = (data.dm.contacts||[])[i]?.status || 'pending';
+        const badge = status==='sent'?'<span class="badge bg-success">Sent</span>'
+          : status==='failed'?'<span class="badge bg-danger">Failed</span>'
+          : '<span class="badge bg-secondary">Pending</span>';
+        html += '<tr><td>'+(i+1)+'</td><td>'+p.phone+'</td><td class="text-truncate" style="max-width:200px">'+escapeHtml(p.preview)+'</td><td>'+badge+'</td></tr>';
+      });
+      html += '</tbody></table></div>';
+      const t = data.totalContacts||0;
+      if(!t) html = '<p class="text-muted">No contacts loaded.</p>';
+      Swal.fire({title:'Contacts ('+t+')',html,width:750});
+    }).catch(e=>{Swal.close();Swal.fire('Error',e.message,'error');});
+}
+
+function duplicateDm(id) {
+  Swal.fire({title:'Duplicate template?',text:'Creates a new draft copy',icon:'question',showCancelButton:true}).then(r=>{
+    if(!r.isConfirmed) return;
+    fetch('/dynamic-messaging/'+id+'/duplicate',{method:'POST',headers:{'x-csrf-token':csrfToken,'Accept':'application/json'}}).then(r=>r.json()).then(d=>{
+      if(d.success) Swal.fire('Done','Template duplicated','success').then(()=>location.reload());
+      else Swal.fire('Error',d.message,'error');
+    });
+  });
+}
+function deleteMsg(id) {
+  Swal.fire({title:'Delete template?',icon:'warning',showCancelButton:true}).then(r=>{ if(r.isConfirmed) fetch('/dynamic-messaging/'+id, {method:'DELETE',headers:{'x-csrf-token':csrfToken,'Accept':'application/json'}}).then(r=>r.json()).then(d=>{ if(d.success) location.reload(); else Swal.fire('Error',d.message,'error'); }); });
+}
+
+function escapeHtml(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML;}
+
+// Auto-refresh when any is processing
+(function(){const p=document.querySelector('#dmTableBody .badge.bg-primary');if(p)setTimeout(()=>location.reload(),5000);})();
+</script>

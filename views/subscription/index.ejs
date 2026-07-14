@@ -1,0 +1,83 @@
+<%- include('../partials/header') %>
+<%- include('../partials/sidebar') %>
+<div class="main-content">
+  <%- include('../partials/navbar') %>
+  <div class="content p-7 m-4">
+    <h4 class="mb-3">My Subscriptions</h4>
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <table class="table datatable">
+          <thead><tr><th>Plan</th><th>Status</th><th>Start</th><th>End</th><th>Price</th><th>Features</th><th>Actions</th></tr></thead>
+          <tbody>
+            <% (subscriptions || []).forEach(s => { %>
+              <tr id="feat-row-<%= s._id %>" data-features='<%= JSON.stringify(s.features || {}) %>'>
+                <td>
+                  <%= s.plan?.name || 'N/A' %>
+                  <% if (s.isCustom) { %><span class="badge bg-warning ms-1">Custom</span><% } %>
+                  <% if (s.notes) { %><br><small class="text-muted"><%= s.notes %></small><% } %>
+                </td>
+                <td><span class="badge bg-<%= s.status === 'active' ? 'success' : s.status === 'expired' ? 'danger' : s.status === 'trial' ? 'info' : 'secondary' %>"><%= s.status %></span></td>
+                <td><%= new Date(s.startDate).toLocaleDateString() %></td>
+                <td><%= new Date(s.endDate).toLocaleDateString() %></td>
+                <td>₹<%= s.price.toLocaleString() %></td>
+                <td>
+                  <% if (s.features) { %>
+                    <button class="btn btn-sm btn-outline-info" onclick="showFeatures('<%= s._id %>')"><i class="fas fa-list"></i> Details</button>
+                  <% } %>
+                </td>
+                <td>
+                  <% if (s.status === 'active' || s.status === 'trial') { %>
+                    <button onclick="cancelSub('<%= s._id %>')" class="btn btn-sm btn-danger">Cancel</button>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+        <% if (!subscriptions || subscriptions.length === 0) { %>
+          <div class="text-center py-4"><p class="text-muted">No subscriptions found.</p><a href="/plans" class="btn btn-success">Browse Plans</a></div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+  <%- include('../partials/footer') %>
+</div>
+<!-- Features Modal -->
+<div class="modal fade" id="featuresModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title">Plan Features</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body"><div class="table-responsive"><table class="table table-sm table-bordered mb-0" id="featuresTable"><thead><tr><th>Feature</th><th>Value</th></tr></thead><tbody></tbody></table></div></div>
+</div></div></div>
+
+<script>
+const FEATURE_LABELS = {
+  whatsappInstances:'WhatsApp Instances',dailyMessageLimit:'Daily Msg Limit',monthlyMessageLimit:'Monthly Msg Limit',
+  contactsLimit:'Contacts Limit',groupsLimit:'Groups Limit',teamMembers:'Team Members',
+  apiKeys:'API Keys',webhookUrls:'Webhook URLs',
+  apiAccess:'API Access',webhookAccess:'Webhook Access',campaignAccess:'Campaign Access',
+  bulkMessaging:'Bulk Messaging',chatbot:'Chatbot',dynamicMessaging:'Dynamic Messaging',
+  scheduler:'Scheduler',mediaMessaging:'Media Messaging',exportData:'Export Data',
+  outgoingMessages:'Outgoing Messages',incomingMessages:'Incoming Messages'
+};
+
+function showFeatures(id) {
+  const tr = document.querySelector(`#feat-row-${CSS.escape(id)}`);
+  if (!tr) return;
+  const tbody = document.querySelector('#featuresTable tbody');
+  tbody.innerHTML = '';
+  const features = JSON.parse(tr.dataset.features || '{}');
+  const order = ['whatsappInstances','dailyMessageLimit','monthlyMessageLimit','contactsLimit','groupsLimit','teamMembers','apiKeys','webhookUrls','apiAccess','webhookAccess','campaignAccess','bulkMessaging','chatbot','dynamicMessaging','scheduler','mediaMessaging','exportData','outgoingMessages','incomingMessages'];
+  for (const key of order) {
+    if (!(key in features)) continue;
+    const val = features[key];
+    let display;
+    if (val === true) display = '<i class="fas fa-check text-success"></i>';
+    else if (val === false) display = '<i class="fas fa-times text-danger"></i>';
+    else if (val === -1) display = '∞ Unlimited';
+    else display = val;
+    tbody.innerHTML += '<tr><td>'+(FEATURE_LABELS[key]||key)+'</td><td>'+display+'</td></tr>';
+  }
+  new bootstrap.Modal(document.getElementById('featuresModal')).show();
+}
+
+function cancelSub(id) { Swal.fire({title:'Cancel Subscription?',icon:'warning',showCancelButton:true}).then(r=>{if(r.isConfirmed)api('/subscriptions/'+id+'/cancel',{method:'PUT'}).then(r=>r.json()).then(d=>{if(d.success)location.reload();else Swal.fire('Error',d.message,'error');});}); }
+</script>

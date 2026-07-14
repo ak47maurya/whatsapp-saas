@@ -1,0 +1,65 @@
+<%- include('../partials/header') %>
+<%- include('../partials/sidebar') %>
+<div class="main-content">
+  <%- include('../partials/navbar') %>
+  <div class="content p-7 m-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="mb-0">API Keys</h4>
+      <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#apiKeyModal"><i class="fas fa-plus"></i> Generate Key</button>
+    </div>
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <table class="table datatable">
+          <thead><tr><th>Name</th><th>Key</th><th>Permissions</th><th>Last Used</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>
+            <% (apiKeys || []).forEach(k => { %>
+              <tr>
+                <td><%= k.name %></td>
+                <td><code class="text-truncate" style="max-width:180px;display:inline-block;vertical-align:middle"><%= k.key?.slice(0,20) %>...</code> <button onclick="copyKey('<%= k.key %>')" class="btn btn-sm btn-outline-secondary" title="Copy Full Key"><i class="fas fa-copy"></i></button></td>
+                <td><% (k.permissions || []).forEach(p => { %><span class="badge bg-info me-1"><%= p %></span><% }) %></td>
+                <td><%= k.lastUsed ? new Date(k.lastUsed).toLocaleString() : 'Never' %></td>
+                <td><span class="badge bg-<%= k.isActive ? 'success' : 'secondary' %>"><%= k.isActive ? 'Active' : 'Inactive' %></span></td>
+                <td>
+                  <button onclick="regenerateKey('<%= k._id %>')" class="btn btn-sm btn-warning"><i class="fas fa-sync"></i></button>
+                  <button onclick="deleteKey('<%= k._id %>')" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <%- include('../partials/footer') %>
+</div>
+
+<div class="modal fade" id="apiKeyModal"><div class="modal-dialog"><div class="modal-content">
+  <div class="modal-header"><h5>Generate API Key</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+    <div class="mb-3"><label class="form-label">Key Name</label><input id="keyName" type="text" class="form-control" required placeholder="Production Key"></div>
+    <div class="mb-3"><label class="form-label">Permissions</label>
+      <% ['send_message','send_media','send_bulk','create_campaign','read_instances','read_messages','read_contacts','manage_webhooks'].forEach(p => { %>
+        <div class="form-check"><input class="form-check-input" type="checkbox" name="perms" value="<%= p %>" checked><label class="form-check-label"><%= p %></label></div>
+      <% }) %>
+    </div>
+  </div>
+  <div class="modal-footer"><button onclick="generateKey()" class="btn btn-success">Generate</button></div>
+</div></div></div>
+
+<script>
+function generateKey() {
+  const name = document.getElementById('keyName').value;
+  if (!name) { Swal.fire('Error','Key name required','error'); return; }
+  const perms = [...document.querySelectorAll('input[name=perms]:checked')].map(c => c.value);
+  api('/api-keys', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, permissions: perms}) })
+    .then(r=>r.json()).then(d => {
+      if (!d.success) { Swal.fire('Error',d.message,'error'); return; }
+      const key = d.data.apiKey.key;
+      document.getElementById('apiKeyModal').querySelector('.btn-close').click();
+      Swal.fire({ title:'API Key Generated', html:`<div class="text-start"><strong>Key:</strong><br><code class="text-break" style="font-size:13px">${key}</code><br><small class="text-danger">Copy this now — it won't be shown again!</small></div>`, icon:'success', confirmButtonText:'Copied!' }).then(() => location.reload());
+    }).catch(e => Swal.fire('Error',e.message,'error'));
+}
+function copyKey(key) { navigator.clipboard.writeText(key).then(() => Swal.fire({title:'Copied!',text:'API key copied to clipboard',icon:'success',timer:1500,showConfirmButton:false})); }
+function regenerateKey(id) { Swal.fire({title:'Regenerate Key?',icon:'warning',showCancelButton:true}).then(r=>{if(r.isConfirmed)api('/api-keys/'+id+'/regenerate',{method:'POST'}).then(r=>r.json()).then(d=>{if(d.success)location.reload();else Swal.fire('Error',d.message,'error');});}); }
+function deleteKey(id) { Swal.fire({title:'Delete Key?',icon:'warning',showCancelButton:true}).then(r=>{if(r.isConfirmed)api('/api-keys/'+id,{method:'DELETE'}).then(r=>r.json()).then(d=>{if(d.success)location.reload();else Swal.fire('Error',d.message,'error');});}); }
+</script>

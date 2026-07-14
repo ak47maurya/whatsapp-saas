@@ -1,0 +1,52 @@
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+  <div class="container-fluid">
+    <button class="btn btn-dark d-lg-none me-2" type="button" onclick="toggleSidebar()">
+      <i class="fas fa-bars"></i>
+    </button>
+    <a class="navbar-brand" href="/dashboard">
+      <svg width="28" height="28" viewBox="0 0 100 100" fill="none" style="vertical-align:middle">
+        <rect x="10" y="10" width="80" height="80" rx="18" fill="url(#ag1)" stroke="#00d4ff" stroke-width="3"/>
+        <text x="50" y="66" text-anchor="middle" fill="#00d4ff" font-size="48" font-weight="bold" font-family="sans-serif">A</text>
+        <defs><linearGradient id="ag1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#0a0a2e"/><stop offset="100%" stop-color="#001a33"/></linearGradient></defs>
+      </svg>
+      <span class="brand-text">akautomation</span>
+    </a>
+    <div class="ms-auto d-flex align-items-center">
+      <a href="/notifications" class="btn btn-dark position-relative me-2" title="Notifications">
+        <i class="fas fa-bell"></i>
+        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger notify-badge" style="display:none">0</span>
+      </a>
+
+      <% if (isAdmin) { %>
+      <div class="dropdown me-2">
+        <button class="btn btn-dark dropdown-toggle" type="button" data-bs-toggle="dropdown">
+          <i class="fas fa-tools"></i> <span class="d-none d-sm-inline">Admin</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><a class="dropdown-item" href="/admin/dashboard"><i class="fas fa-chart-bar"></i> Dashboard</a></li>
+          <li><a class="dropdown-item" href="/users"><i class="fas fa-users"></i> Users</a></li>
+          <li><a class="dropdown-item" href="/plans"><i class="fas fa-box"></i> Plans</a></li>
+          <li><a class="dropdown-item" href="/subscriptions"><i class="fas fa-credit-card"></i> Subscriptions</a></li>
+        </ul>
+      </div>
+      <% } %>
+
+      <div class="dropdown">
+        <button class="btn btn-dark dropdown-toggle" type="button" data-bs-toggle="dropdown">
+          <i class="fas fa-user-circle"></i>
+          <span class="d-none d-sm-inline ms-1"><%= user?.name || 'User' %></span>
+          <% if (user?.role === 'super_admin') { %><span class="badge bg-danger ms-1">SA</span><% } %>
+          <% if (user?.role === 'admin') { %><span class="badge bg-warning ms-1">Admin</span><% } %>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><h6 class="dropdown-header"><%= user?.email %></h6></li>
+          <li><a class="dropdown-item" href="/dashboard"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+          <li><a class="dropdown-item" href="/subscriptions"><i class="fas fa-credit-card"></i> Subscription</a></li>
+          <li><a class="dropdown-item" href="/api-keys"><i class="fas fa-key"></i> API Keys</a></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><a class="dropdown-item text-danger" href="/auth/logout"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</nav>

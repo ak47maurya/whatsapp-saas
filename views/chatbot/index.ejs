@@ -1,0 +1,130 @@
+<%- include('../partials/header') %>
+<%- include('../partials/sidebar') %>
+<div class="main-content">
+  <%- include('../partials/navbar') %>
+  <div class="content p-7 m-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="mb-0">Chatbot Rules</h4>
+      <button class="btn btn-success" onclick="openCreateBot()"><i class="fas fa-plus"></i> Add Rule</button>
+    </div>
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light"><tr><th>Name</th><th>Instance</th><th>Keywords</th><th>Response</th><th>Match</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+              <% (bots || []).forEach(b => { %>
+              <tr>
+                <td><strong><%= b.name %></strong></td>
+                <td><%= b.instance?.name || 'N/A' %></td>
+                <td><%= (b.keywords || []).join(', ') %></td>
+                <td class="text-truncate" style="max-width:200px"><%= b.response %></td>
+                <td><span class="badge bg-secondary"><%= b.matchType %></span></td>
+                <td><span class="badge bg-<%= b.isActive ? 'success' : 'danger' %>"><%= b.isActive ? 'Active' : 'Inactive' %></span></td>
+                <td>
+                  <button onclick="testBot('<%= b._id %>', '<%= b.name %>')" class="btn btn-sm btn-success" title="Test"><i class="fas fa-play"></i></button>
+                  <button onclick="toggleBot('<%= b._id %>', <%= !b.isActive %>)" class="btn btn-sm btn-<%= b.isActive ? 'warning' : 'success' %>"><i class="fas fa-<%= b.isActive ? 'pause' : 'play' %>"></i></button>
+                  <button onclick="deleteBot('<%= b._id %>')" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                </td>
+              </tr>
+              <% }) %>
+              <% if (!bots || bots.length === 0) { %><tr><td colspan="7" class="text-center py-4 text-muted">No chatbot rules yet.</td></tr><% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <%- include('../partials/footer') %>
+</div>
+
+<div class="modal fade" id="botCreateModal"><div class="modal-dialog"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title">New Chatbot Rule</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <form id="botCreateForm">
+    <div class="modal-body">
+      <div class="mb-3">
+        <label class="form-label">Rule Name</label>
+        <input type="text" id="cb_name" class="form-control" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Instance</label>
+        <select id="cb_inst" class="form-select" required>
+          <option value="">Select Instance</option>
+          <% (instances || []).forEach(i => { %><option value="<%= i._id %>"><%= i.name %><%= i.phone ? ' ('+i.phone+')' : '' %></option><% }) %>
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Keywords</label>
+        <input type="text" id="cb_kw" class="form-control" placeholder="comma, separated, keywords">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Match Type</label>
+        <select id="cb_match" class="form-select">
+          <option value="contains">Contains</option>
+          <option value="exact">Exact Match</option>
+          <option value="regex">Regex</option>
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Response</label>
+        <textarea id="cb_resp" class="form-control" rows="3"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+      <button type="submit" class="btn btn-success">Create</button>
+    </div>
+  </form>
+</div></div></div>
+
+<script>
+function testBot(id, name) {
+  Swal.fire({
+    title: 'Test: ' + name,
+    input: 'text',
+    inputPlaceholder: 'Enter a test message...',
+    showCancelButton: true,
+    confirmButtonText: 'Send Test',
+    preConfirm: (msg) => {
+      if (!msg) { Swal.showValidationMessage('Enter a message'); return false; }
+      return fetch('/chatbot/test-reply', { method:'POST', headers:{'x-csrf-token':csrfToken,'Content-Type':'application/json','Accept':'application/json'}, body:JSON.stringify({botId:id, testMessage:msg}) }).then(r=>r.json()).then(d=>{
+        if(!d.success) { Swal.showValidationMessage(d.message); return false; }
+        Swal.fire('Result', d.message, d.data?.matched ? 'success' : 'info');
+        return d;
+      });
+    }
+  });
+}
+function openCreateBot() {
+  document.getElementById('botCreateForm').reset();
+  new bootstrap.Modal(document.getElementById('botCreateModal')).show();
+}
+
+document.getElementById('botCreateForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const data = {
+    name: document.getElementById('cb_name').value,
+    instance: document.getElementById('cb_inst').value,
+    keywords: document.getElementById('cb_kw').value,
+    matchType: document.getElementById('cb_match').value,
+    response: document.getElementById('cb_resp').value,
+  };
+  if (!data.name || !data.instance || !data.response) { Swal.fire('Error','Name, instance and response required','error'); return; }
+  fetch('/chatbot', { method:'POST', headers:{'x-csrf-token':csrfToken,'Content-Type':'application/json','Accept':'application/json'}, body:JSON.stringify(data) })
+    .then(r=>r.json()).then(d=>{
+      if(d.success) {
+        bootstrap.Modal.getInstance(document.getElementById('botCreateModal')).hide();
+        Swal.fire('Done','Rule created','success').then(()=>location.reload());
+      } else {
+        Swal.fire('Error',d.message,'error');
+      }
+    }).catch(e=>Swal.fire('Error',e.message,'error'));
+});
+
+function toggleBot(id, active) {
+  fetch('/chatbot/'+id, { method:'PUT', headers:{'x-csrf-token':csrfToken,'Content-Type':'application/json','Accept':'application/json'}, body:JSON.stringify({isActive: active}) }).then(r=>r.json()).then(d=>{ if(d.success) location.reload(); else Swal.fire('Error',d.message,'error'); });
+}
+function deleteBot(id) {
+  Swal.fire({title:'Delete rule?',icon:'warning',showCancelButton:true}).then(r=>{ if(r.isConfirmed) fetch('/chatbot/'+id, {method:'DELETE',headers:{'x-csrf-token':csrfToken,'Accept':'application/json'}}).then(r=>r.json()).then(d=>{ if(d.success) location.reload(); else Swal.fire('Error',d.message,'error'); }); });
+}
+</script>

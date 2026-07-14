@@ -1,0 +1,124 @@
+<%- include('../partials/header') %>
+<%- include('../partials/sidebar') %>
+<div class="main-content">
+  <%- include('../partials/navbar') %>
+  <div class="content p-7 m-4">
+    <h4 class="mb-4">API Documentation</h4>
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white"><h5 class="mb-0">Authentication</h5></div>
+      <div class="card-body">
+        <p>All API requests require an API key. Include it in the header:</p>
+        <pre class="bg-dark text-light p-3 rounded"><code>X-API-Key: wa_your_api_key_here</code></pre>
+        <p>Get your API key from <a href="/api-keys">API Keys</a> page.</p>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white"><h5 class="mb-0">Send Message</h5></div>
+      <div class="card-body">
+        <p><span class="badge bg-success">POST</span> /api/send-message</p>
+        <pre class="bg-dark text-light p-3 rounded"><code>{
+  "instanceId": "INSTANCE_ID",
+  "to": "2348012345678",
+  "type": "text",
+  "text": "Hello World"
+}</code></pre>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white"><h5 class="mb-0">Send Media</h5></div>
+      <div class="card-body">
+        <p><span class="badge bg-success">POST</span> /api/send-media</p>
+        <pre class="bg-dark text-light p-3 rounded"><code>{
+  "instanceId": "INSTANCE_ID",
+  "to": "2348012345678",
+  "type": "image",
+  "mediaUrl": "https://example.com/image.jpg",
+  "caption": "Check this out"
+}</code></pre>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white"><h5 class="mb-0">Send Bulk Messages</h5></div>
+      <div class="card-body">
+        <p><span class="badge bg-success">POST</span> /api/send-bulk</p>
+        <pre class="bg-dark text-light p-3 rounded"><code>{
+  "instanceId": "INSTANCE_ID",
+  "type": "text",
+  "text": "Hello {{name}}",
+  "recipients": [
+    {"phone": "2348012345678", "name": "John"},
+    {"phone": "2348098765432", "name": "Jane"}
+  ]
+}</code></pre>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white"><h5 class="mb-0">Create Campaign</h5></div>
+      <div class="card-body">
+        <p><span class="badge bg-success">POST</span> /api/create-campaign</p>
+        <pre class="bg-dark text-light p-3 rounded"><code>{
+  "instanceId": "INSTANCE_ID",
+  "name": "My Campaign",
+  "text": "Your OTP is 1234",
+  "recipients": [{"phone": "2348012345678"}],
+  "scheduledAt": "2025-01-01T10:00:00Z"
+}</code></pre>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white"><h5 class="mb-0">Send Group Message</h5></div>
+      <div class="card-body">
+        <p><span class="badge bg-success">POST</span> /api/send-group</p>
+        <pre class="bg-dark text-light p-3 rounded"><code>{
+  "instanceId": "INSTANCE_ID",
+  "groupJid": "123456789-123456@g.us",
+  "type": "text",
+  "text": "Hello group!"
+}</code></pre>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white"><h5 class="mb-0">Send Group Media</h5></div>
+      <div class="card-body">
+        <p><span class="badge bg-success">POST</span> /api/send-group</p>
+        <pre class="bg-dark text-light p-3 rounded"><code>{
+  "instanceId": "INSTANCE_ID",
+  "groupJid": "123456789-123456@g.us",
+  "type": "image",
+  "mediaUrl": "https://example.com/image.jpg",
+  "caption": "Check this out"
+}</code></pre>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white"><h5 class="mb-0">List Groups</h5></div>
+      <div class="card-body">
+        <p><span class="badge bg-primary">GET</span> /api/groups?instanceId=ID&page=1&limit=20</p>
+      </div>
+    </div>
+
+
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white"><h5 class="mb-0">Get Instance Status</h5></div>
+      <div class="card-body">
+        <p><span class="badge bg-primary">GET</span> /api/instance-status</p>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white"><h5 class="mb-0">Get Message History</h5></div>
+      <div class="card-body">
+        <p><span class="badge bg-primary">GET</span> /api/message-history?instanceId=ID&limit=50</p>
+      </div>
+    </div>
+  </div>
+  <%- include('../partials/footer') %>
+</div>

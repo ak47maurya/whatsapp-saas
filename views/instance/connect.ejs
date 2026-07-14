@@ -1,0 +1,130 @@
+<%- include('../partials/header') %>
+<%- include('../partials/sidebar') %>
+<div class="main-content">
+  <%- include('../partials/navbar') %>
+  <div class="content p-3">
+    <div class="text-center">
+      <h4>Connect: <strong><%= instance.name %></strong></h4>
+      <p class="text-muted">Scan the QR code with WhatsApp on your phone</p>
+
+      <div id="qrContainer" class="my-4">
+        <% if (instance.qrCode?.code) { %>
+          <img src="<%= instance.qrCode.code %>" alt="QR Code" id="qrImage" class="img-fluid" style="max-width:300px;border-radius:12px">
+        <% } else if (instance.status === 'connected') { %>
+          <i class="fas fa-check-circle text-success" style="font-size:5rem"></i>
+          <h5 class="mt-2 text-success">WhatsApp Connected</h5>
+        <% } else { %>
+          <div class="spinner-border text-success" role="status"></div>
+          <p class="mt-2">Generating QR code...</p>
+        <% } %>
+      </div>
+
+      <div id="statusBox" class="alert alert-<%= instance.status === 'connected' ? 'success' : instance.status === 'disconnected' ? 'danger' : 'secondary' %> d-inline-block px-4">
+        Status: <strong id="statusText"><%= instance.status %></strong>
+      </div>
+
+      <% if (instance.status === 'qr_ready') { %>
+      <div id="expiryInfo" class="text-muted small mb-2">
+        QR code expires in <span id="countdown">60</span>s
+      </div>
+      <% } %>
+
+      <div class="mt-3">
+        <a href="/instances" class="btn btn-outline-secondary">Back to Instances</a>
+      </div>
+
+      <hr class="my-4">
+      <div class="text-start" style="max-width:400px;margin:auto">
+        <h6>How to scan:</h6>
+        <ol>
+          <li>Open <strong>WhatsApp</strong> on your phone</li>
+          <li>Tap <strong>Menu (⋮)</strong> → <strong>Linked Devices</strong></li>
+          <li>Tap <strong>Link a Device</strong></li>
+          <li>Point your phone at this QR code</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+  <%- include('../partials/footer') %>
+</div>
+
+<script>
+const socket = io({ auth: { token: '<%= token || "" %>' } });
+const instanceId = '<%= instance._id %>';
+
+// If already connected on page load, redirect after 2s
+<% if (instance.status === 'connected') { %>
+setTimeout(() => { window.location.href = '/instances'; }, 2000);
+<% } %>
+
+// Polling fallback for status changes (in case socket events are missed)
+setInterval(async () => {
+  try {
+    const resp = await fetch('/instances/'+instanceId+'/status', { headers: { Accept: 'application/json' } });
+    const data = await resp.json();
+    if (data.success && data.data) {
+      const status = data.data.instance?.status || data.data.status?.connection;
+      if (status === 'connected') {
+        onConnected(instanceId);
+      } else if (status === 'disconnected') {
+        onDisconnected(instanceId);
+      } else if (status === 'qr_ready' && data.data.instance?.qrCode?.code) {
+        document.getElementById('qrContainer').innerHTML = '<img src="'+data.data.instance.qrCode.code+'" alt="QR Code" class="img-fluid" style="max-width:300px;border-radius:12px">';
+        document.getElementById('statusText').textContent = 'qr_ready';
+      }
+    }
+  } catch {}
+}, 5000);
+
+function onConnected(id) {
+  const box = document.getElementById('statusBox');
+  if (box && box.className.indexOf('alert-success') === -1) {
+    box.className = 'alert alert-success d-inline-block px-4';
+    document.getElementById('statusText').textContent = 'Connected!';
+    document.getElementById('qrContainer').innerHTML = '<i class="fas fa-check-circle text-success" style="font-size:5rem"></i><h5 class="mt-2 text-success">WhatsApp Connected</h5>';
+    setTimeout(() => { window.location.href = '/instances'; }, 2000);
+  }
+}
+
+function onDisconnected(id) {
+  const box = document.getElementById('statusBox');
+  if (box && box.className.indexOf('alert-danger') === -1) {
+    box.className = 'alert alert-danger d-inline-block px-4';
+    document.getElementById('statusText').textContent = 'Disconnected';
+  }
+}
+
+socket.on('instance:qr', (data) => {
+  if (data.instanceId === instanceId && data.qr) {
+    document.getElementById('qrContainer').innerHTML = '<img src="'+data.qr+'" alt="QR Code" class="img-fluid" style="max-width:300px;border-radius:12px">';
+    document.getElementById('statusText').textContent = 'qr_ready';
+    document.getElementById('statusBox').className = 'alert alert-secondary d-inline-block px-4';
+    // Reset countdown
+    const expiryInfo = document.getElementById('expiryInfo');
+    if (expiryInfo) expiryInfo.style.display = '';
+    countdown = 60;
+  }
+});
+
+socket.on('instance:connected', (data) => {
+  if (data.instanceId === instanceId) onConnected(instanceId);
+});
+
+socket.on('instance:disconnected', (data) => {
+  if (data.instanceId === instanceId) onDisconnected(instanceId);
+});
+
+// QR countdown & auto-refresh
+let countdown = 60;
+setInterval(() => {
+  const el = document.getElementById('countdown');
+  if (el) {
+    countdown--;
+    el.textContent = countdown;
+    if (countdown <= 0) {
+      // Reload the page to get a fresh QR
+      window.location.reload();
+    }
+  }
+}, 1000);
+</script>

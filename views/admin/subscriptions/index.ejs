@@ -1,0 +1,44 @@
+<%- include('../../partials/header') %>
+<%- include('../../partials/sidebar') %>
+<div class="main-content">
+  <%- include('../../partials/navbar') %>
+  <div class="content p-7 m-4">
+    <h4 class="mb-3">Subscription Management</h4>
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 datatable">
+            <thead class="table-light">
+              <tr><th>User</th><th>Plan</th><th>Status</th><th>Period</th><th>Price</th><th>Payment</th><th>Custom</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+              <% (subscriptions || []).forEach(s => { %>
+                <tr>
+                  <td><%= s.user?.name || '—' %><br><small class="text-muted"><%= s.user?.email || '' %></small></td>
+                  <td>
+                    <%= s.plan?.name || 'N/A' %>
+                    <% if (s.isCustom) { %><span class="badge bg-warning ms-1">Custom</span><% } %>
+                  </td>
+                  <td><span class="badge bg-<%= s.status === 'active' ? 'success' : s.status === 'expired' ? 'danger' : s.status === 'trial' ? 'info' : 'secondary' %>"><%= s.status %></span></td>
+                  <td><%= new Date(s.startDate).toLocaleDateString() %> – <%= new Date(s.endDate).toLocaleDateString() %></td>
+                  <td><%= s.currency || '₹' %><%= s.price.toLocaleString() %></td>
+                  <td><span class="badge bg-<%= s.paymentStatus === 'paid' ? 'success' : 'warning' %>"><%= s.paymentStatus %></span> <small class="text-muted"><%= s.paymentMethod %></small></td>
+                  <td><%= s.isCustom ? '<i class="fas fa-check text-warning"></i>' : '—' %></td>
+                  <td>
+                    <% if (s.notes) { %>
+                      <button class="btn btn-sm btn-outline-info" onclick="Swal.fire('Notes','<%= s.notes %>','info')" title="Notes"><i class="fas fa-sticky-note"></i></button>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <% if (!subscriptions || subscriptions.length === 0) { %>
+          <div class="text-center py-4"><p class="text-muted">No subscriptions found.</p></div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+  <%- include('../../partials/footer') %>
+</div>

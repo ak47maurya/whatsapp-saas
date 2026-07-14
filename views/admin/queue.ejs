@@ -1,0 +1,70 @@
+<%- include('../partials/header') %>
+<%- include('../partials/sidebar') %>
+<div class="main-content">
+  <%- include('../partials/navbar') %>
+  <div class="content p-7 m-4">
+    <h4 class="mb-3"><i class="fas fa-tasks text-success me-2"></i>Queue Management</h4>
+
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Instance</th>
+                <th>Status</th>
+                <th>Waiting</th>
+                <th>Active</th>
+                <th>Completed</th>
+                <th>Failed</th>
+                <th>Delayed</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (queues.length === 0) { %>
+                <tr><td colspan="8" class="text-center text-muted py-4">No active queues</td></tr>
+              <% } %>
+              <% queues.forEach(q => { %>
+                <% const instId = q.name.split(':').pop(); %>
+                <% const inst = instances.find(i => String(i._id) === instId); %>
+                <tr>
+                  <td><%= inst?.name || instId %><br><small class="text-muted"><%= inst?.phone || '' %></small></td>
+                  <td>
+                    <% if (q.isPaused) { %>
+                      <span class="badge bg-warning">Paused</span>
+                    <% } else { %>
+                      <span class="badge bg-success">Active</span>
+                    <% } %>
+                  </td>
+                  <td><span class="badge bg-secondary"><%= q.waiting || 0 %></span></td>
+                  <td><span class="badge bg-primary"><%= q.active || 0 %></span></td>
+                  <td><span class="badge bg-info"><%= q.completed || 0 %></span></td>
+                  <td><span class="badge bg-danger"><%= q.failed || 0 %></span></td>
+                  <td><span class="badge bg-warning"><%= q.delayed || 0 %></span></td>
+                  <td nowrap>
+                    <% if (q.isPaused) { %>
+                      <button onclick="resumeQueue('<%= instId %>')" class="btn btn-sm btn-success" title="Resume"><i class="fas fa-play"></i></button>
+                    <% } else { %>
+                      <button onclick="pauseQueue('<%= instId %>')" class="btn btn-sm btn-warning" title="Pause"><i class="fas fa-pause"></i></button>
+                    <% } %>
+                    <button onclick="cleanQueue('<%= instId %>')" class="btn btn-sm btn-info" title="Clean Completed"><i class="fas fa-broom"></i></button>
+                    <button onclick="deleteQueue('<%= instId %>')" class="btn btn-sm btn-danger" title="Remove Queue"><i class="fas fa-trash"></i></button>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <%- include('../partials/footer') %>
+</div>
+
+<script>
+function pauseQueue(id) { api('/admin/queue/'+id+'/pause', {method:'POST'}).then(r=>r.json()).then(d=>{if(d.success)location.reload();else Swal.fire('Error',d.message,'error');}); }
+function resumeQueue(id) { api('/admin/queue/'+id+'/resume', {method:'POST'}).then(r=>r.json()).then(d=>{if(d.success)location.reload();else Swal.fire('Error',d.message,'error');}); }
+function cleanQueue(id) { Swal.fire({title:'Clean completed jobs?',icon:'question',showCancelButton:true}).then(r=>{if(r.isConfirmed)api('/admin/queue/'+id+'/clean',{method:'POST'}).then(r=>r.json()).then(d=>{if(d.success)location.reload();else Swal.fire('Error',d.message,'error');});}); }
+function deleteQueue(id) { Swal.fire({title:'Remove queue? All pending jobs will be lost.',icon:'warning',showCancelButton:true}).then(r=>{if(r.isConfirmed)api('/admin/queue/'+id,{method:'DELETE'}).then(r=>r.json()).then(d=>{if(d.success)location.reload();else Swal.fire('Error',d.message,'error');});}); }
+</script>

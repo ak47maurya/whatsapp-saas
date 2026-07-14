@@ -1,0 +1,106 @@
+<%- include('../partials/header') %>
+<%- include('../partials/sidebar') %>
+<div class="main-content">
+  <%- include('../partials/navbar') %>
+  <div class="content p-7 m-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <h4 class="mb-0"><i class="fas fa-chart-bar text-success me-2"></i>Campaign Analytics</h4>
+        <small class="text-muted"><%= campaign.name %> — <%= campaign.instance?.name || '—' %></small>
+      </div>
+      <a href="/campaigns" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i> Back</a>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-md-3">
+        <div class="card border-0 shadow-sm text-center p-3">
+          <h6 class="text-muted mb-1">Total</h6>
+          <h3 class="text-primary mb-0"><%= analytics.total %></h3>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card border-0 shadow-sm text-center p-3">
+          <h6 class="text-muted mb-1">Sent</h6>
+          <h3 class="text-success mb-0"><%= analytics.sent %></h3>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card border-0 shadow-sm text-center p-3">
+          <h6 class="text-muted mb-1">Delivered</h6>
+          <h3 class="text-info mb-0"><%= analytics.delivered %></h3>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card border-0 shadow-sm text-center p-3">
+          <h6 class="text-muted mb-1">Read</h6>
+          <h3 class="text-warning mb-0"><%= analytics.read %></h3>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card border-0 shadow-sm text-center p-3">
+          <h6 class="text-muted mb-1">Failed</h6>
+          <h3 class="text-danger mb-0"><%= analytics.failed %></h3>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card border-0 shadow-sm text-center p-3">
+          <h6 class="text-muted mb-1">Pending</h6>
+          <h3 class="text-secondary mb-0"><%= analytics.pending %></h3>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card border-0 shadow-sm text-center p-3">
+          <h6 class="text-muted mb-1">Success Rate</h6>
+          <h3 class="mb-0"><%= analytics.successRate %>%</h3>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card border-0 shadow-sm text-center p-3">
+          <h6 class="text-muted mb-1">Status</h6>
+          <h3><span class="badge bg-<%= campaign.status === 'completed' ? 'success' : campaign.status === 'running' ? 'primary' : campaign.status === 'failed' ? 'danger' : 'secondary' %>" style="font-size:1rem"><%= campaign.status %></span></h3>
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <h5 class="mb-3">Progress</h5>
+        <div class="progress" style="height:24px">
+          <% const sentPct = analytics.total ? Math.round(analytics.sent/analytics.total*100) : 0; %>
+          <% const failedPct = analytics.total ? Math.round(analytics.failed/analytics.total*100) : 0; %>
+          <% const pendingPct = Math.max(0, 100 - sentPct - failedPct); %>
+          <div class="progress-bar bg-success" style="width:<%= sentPct %>%"><%= sentPct %>%</div>
+          <div class="progress-bar bg-danger" style="width:<%= failedPct %>%"><%= failedPct %>%</div>
+          <div class="progress-bar bg-secondary" style="width:<%= pendingPct %>%"><%= pendingPct %>%</div>
+        </div>
+        <div class="mt-2 small">
+          <span class="text-success me-3"><i class="fas fa-circle me-1"></i>Sent</span>
+          <span class="text-danger me-3"><i class="fas fa-circle me-1"></i>Failed</span>
+          <span class="text-secondary"><i class="fas fa-circle me-1"></i>Pending</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <h5 class="mb-3">Recipients</h5>
+        <table class="table table-sm table-hover">
+          <thead><tr><th>#</th><th>Phone</th><th>Name</th><th>Status</th><th>Sent At</th></tr></thead>
+          <tbody>
+            <% (campaign.recipients || []).slice(0, 200).forEach((r, i) => { %>
+              <tr>
+                <td><%= i+1 %></td>
+                <td><%= r.phone %></td>
+                <td><%= r.name || '—' %></td>
+                <td><span class="badge bg-<%= r.status === 'sent' ? 'success' : r.status === 'delivered' ? 'info' : r.status === 'read' ? 'primary' : r.status === 'failed' ? 'danger' : 'secondary' %>"><%= r.status || 'pending' %></span></td>
+                <td><%= r.sentAt ? new Date(r.sentAt).toLocaleString() : '—' %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+        <% if ((campaign.recipients || []).length > 200) { %><p class="text-muted small mb-0">Showing first 200 of <%= campaign.recipients.length %> recipients</p><% } %>
+      </div>
+    </div>
+  </div>
+  <%- include('../partials/footer') %>
+</div>

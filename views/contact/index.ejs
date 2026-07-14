@@ -1,0 +1,119 @@
+<%- include('../partials/header') %>
+<%- include('../partials/sidebar') %>
+<div class="main-content">
+  <%- include('../partials/navbar') %>
+  <div class="content p-7 m-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="mb-0">Contacts</h4>
+      <div>
+        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#importModal"><i class="fas fa-upload"></i> Import</button>
+        <a href="/contacts/export" class="btn btn-info"><i class="fas fa-download"></i> Export</a>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#contactModal"><i class="fas fa-plus"></i> Add</button>
+      </div>
+    </div>
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <table class="table table-hover datatable">
+          <thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Tags</th><th>Last Message</th><th>Actions</th></tr></thead>
+          <tbody>
+            <% (contacts || []).forEach(c => { %>
+              <tr>
+                <td><%= c.name || '—' %></td>
+                <td><%= c.phone %></td>
+                <td><%= c.email || '—' %></td>
+                <td><% (c.tags || []).forEach(t => { %><span class="badge bg-info me-1"><%= t %></span><% }) %></td>
+                <td><%= c.lastMessageAt ? new Date(c.lastMessageAt).toLocaleString() : '—' %></td>
+                <td>
+                  <button onclick="editContact('<%= c._id %>')" class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i></button>
+                  <button onclick="deleteContact('<%= c._id %>')" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+                  <button onclick="addTags('<%= c._id %>')" class="btn btn-sm btn-outline-info"><i class="fas fa-tags"></i></button>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <%- include('../partials/footer') %>
+</div>
+
+<div class="modal fade" id="contactModal"><div class="modal-dialog"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title">Add Contact</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+  <form id="contactForm" method="POST" action="/contacts">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="modal-body">
+      <div class="mb-3"><label class="form-label">Name</label><input type="text" name="name" class="form-control"></div>
+      <div class="mb-3"><label class="form-label">Phone *</label><input type="text" name="phone" class="form-control" required></div>
+      <div class="mb-3"><label class="form-label">Email</label><input type="email" name="email" class="form-control"></div>
+      <div class="mb-3"><label class="form-label">Tags (comma separated)</label><input type="text" name="tags" class="form-control" placeholder="customer, vip, lead"></div>
+    </div>
+    <div class="modal-footer"><button type="submit" class="btn btn-success">Save</button></div>
+  </form>
+</div></div></div>
+
+<div class="modal fade" id="editContactModal"><div class="modal-dialog"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title">Edit Contact</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+  <form id="editContactForm">
+    <div class="modal-body">
+      <input type="hidden" id="edit_id">
+      <div class="mb-3"><label class="form-label">Name</label><input type="text" id="edit_name" class="form-control"></div>
+      <div class="mb-3"><label class="form-label">Phone *</label><input type="text" id="edit_phone" class="form-control" required></div>
+      <div class="mb-3"><label class="form-label">Email</label><input type="email" id="edit_email" class="form-control"></div>
+      <div class="mb-3"><label class="form-label">Tags (comma separated)</label><input type="text" id="edit_tags" class="form-control" placeholder="customer, vip, lead"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+      <button type="submit" class="btn btn-success">Update</button>
+    </div>
+  </form>
+</div></div></div>
+
+<div class="modal fade" id="importModal"><div class="modal-dialog"><div class="modal-content">
+  <div class="modal-header"><h5>Import Contacts</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+  <form method="POST" action="/contacts/import?_csrf=<%= csrfToken %>" enctype="multipart/form-data">
+    <div class="modal-body">
+      <p class="text-muted">Upload CSV or Excel file with columns: phone, name, email</p>
+      <input type="file" name="file" class="form-control" accept=".csv,.xlsx,.xls" required>
+    </div>
+    <div class="modal-footer"><button type="submit" class="btn btn-success">Import</button></div>
+  </form>
+</div></div></div>
+
+<script>
+function editContact(id) {
+  api('/contacts/'+id, {headers:{'Accept':'application/json'}}).then(r=>r.json()).then(d=>{
+    if(!d.success){Swal.fire('Error',d.message,'error');return;}
+    const c = d.data.contact;
+    document.getElementById('edit_id').value = c._id;
+    document.getElementById('edit_name').value = c.name || '';
+    document.getElementById('edit_phone').value = c.phone || '';
+    document.getElementById('edit_email').value = c.email || '';
+    document.getElementById('edit_tags').value = (c.tags||[]).join(', ');
+    new bootstrap.Modal(document.getElementById('editContactModal')).show();
+  });
+}
+
+document.getElementById('editContactForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const id = document.getElementById('edit_id').value;
+  const data = {
+    name: document.getElementById('edit_name').value,
+    phone: document.getElementById('edit_phone').value,
+    email: document.getElementById('edit_email').value,
+    tags: document.getElementById('edit_tags').value.split(',').map(s=>s.trim()).filter(Boolean),
+  };
+  api('/contacts/'+id, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
+    .then(r=>r.json()).then(d=>{
+      if(d.success) {
+        bootstrap.Modal.getInstance(document.getElementById('editContactModal')).hide();
+        Swal.fire('Done','Contact updated','success').then(()=>location.reload());
+      } else {
+        Swal.fire('Error',d.message,'error');
+      }
+    }).catch(e=>Swal.fire('Error',e.message,'error'));
+});
+
+function deleteContact(id) { Swal.fire({title:'Delete?',icon:'warning',showCancelButton:true}).then(r=>{if(r.isConfirmed)api('/contacts/'+id,{method:'DELETE'}).then(r=>r.json()).then(d=>{if(d.success)location.reload();else Swal.fire('Error',d.message,'error');});}); }
+function addTags(id) { Swal.fire({title:'Add Tags',input:'text',inputLabel:'Tags (comma separated)',showCancelButton:true}).then(r=>{if(r.value)api('/contacts/'+id+'/tags',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tags:r.value.split(',')})}).then(r=>r.json()).then(d=>{if(d.success)location.reload();else Swal.fire('Error',d.message,'error');});}); }
+</script>

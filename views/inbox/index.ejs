@@ -1,0 +1,231 @@
+<%- include('../partials/header') %>
+<%- include('../partials/sidebar') %>
+<div class="main-content" style="height:100vh;min-height:0;overflow:hidden;">
+  <%- include('../partials/navbar') %>
+  <div class="content" style="padding-top:80px!important;overflow:hidden;flex:1;min-height:0;">
+    <div class="row g-0 h-100">
+      <!-- Left Panel - Contact List -->
+      <div class="col-4 border-end d-flex flex-column h-100 bg-white">
+        <div class="flex-shrink-0" style="background:#f0f2f5;padding:10px 12px;">
+          <select class="form-select form-select-sm border-0 shadow-sm" onchange="changeInstance(this.value)" style="background:#fff;border-radius:8px;">
+            <option value="">Select Instance</option>
+            <% (instances || []).forEach(i => { %>
+              <option value="<%= i._id %>" <%= String(selectedInstance) === String(i._id) ? 'selected' : '' %>><%= i.name %><%= i.phone ? ' ('+i.phone+')' : '' %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="flex-shrink-0 p-2" style="background:#f0f2f5;">
+          <input type="search" class="form-control form-control-sm border-0 shadow-sm" placeholder="Search or start new chat" oninput="filterContacts(this.value)" style="border-radius:8px;background:#fff;">
+        </div>
+        <div class="overflow-auto flex-grow-1" style="background:#fff;">
+          <% (conversations || []).forEach(c => { %>
+            <a href="?instanceId=<%= selectedInstance %>&contact=<%= c._id %>" class="text-decoration-none contact-row <%= activeContact === c._id ? 'active' : '' %>">
+              <div class="d-flex align-items-center px-3 py-2" style="border-bottom:1px solid #f2f2f2;">
+                <div class="flex-shrink-0 me-3">
+                  <% if (c._id?.includes('@g.us')) { %>
+                    <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold" style="width:49px;height:49px;background:#5c6bc0;font-size:18px;"><i class="fas fa-users"></i></div>
+                  <% } else { %>
+                    <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold" style="width:49px;height:49px;background:<%= c._id ? '#00a884' : '#dfe5e7' %>;font-size:18px;"><%= (c._id?.split('@')[0]?.split(':')[0] || '?')[0].toUpperCase() %></div>
+                  <% } %>
+                </div>
+                <div class="flex-grow-1 min-width-0">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold text-dark" style="font-size:16px;">
+                      <% if (c._id?.includes('@g.us')) { %>
+                        <%= c._id?.split('@')[0]?.split(':')[0] || c._id %>
+                        <i class="fas fa-users text-muted ms-1" style="font-size:11px"></i>
+                      <% } else if (c._contactName) { %>
+                        <%= c._contactName %>
+                        <small class="text-muted ms-1" style="font-size:11px"><%= c._id?.split('@')[0]?.split(':')[0] || '' %></small>
+                      <% } else { %>
+                        <%= c._id?.split('@')[0]?.split(':')[0] || c._id %>
+                      <% } %>
+                    </span>
+                    <small class="text-muted flex-shrink-0 ms-2" style="font-size:11px;"><%= new Date(c.lastMessageAt).toLocaleString() %></small>
+                  </div>
+                  <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted text-truncate d-block" style="font-size:13px;line-height:1.4;"><%= c.lastMessage || '(no text)' %></span>
+                    <% if (c.unread > 0) { %><span class="badge rounded-pill flex-shrink-0 ms-2" style="background:#25d366;font-size:11px;min-width:20px;"><%= c.unread %></span><% } %>
+                  </div>
+                </div>
+              </div>
+            </a>
+          <% }) %>
+        </div>
+      </div>
+      <!-- Right Panel - Chat Area -->
+      <div class="col-8 d-flex flex-column h-100" id="chatPanel">
+        <% if (activeContact) { %>
+          <div class="flex-shrink-0 px-3 py-2 d-flex align-items-center" style="background:#f0f2f5;border-bottom:1px solid #e9edef;">
+            <% var isGrp = String(activeContact).includes('@g.us'); %>
+            <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold me-3 flex-shrink-0" style="width:40px;height:40px;background:<%= isGrp ? '#5c6bc0' : '#00a884' %>;font-size:16px;">
+              <%= isGrp ? '<i class="fas fa-users"></i>' : String(activeContact).split('@')[0].split(':')[0][0].toUpperCase() %>
+            </div>
+            <span class="fw-semibold" style="font-size:17px;"><%= String(activeContact).split('@')[0].split(':')[0] || activeContact %></span>
+            <% if (isGrp) { %><span class="badge bg-primary ms-2" style="font-size:10px">GROUP</span><% } %>
+          </div>
+          <div class="overflow-auto flex-grow-1 p-3" id="messageArea" style="background-image:url('data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M30 5 L55 30 L30 55 L5 30 Z\' fill=\'%23e5ddd5\' fill-opacity=\'0.4\'/%3E%3C/svg%3E');background-size:60px 60px;background-color:#efeae2;">
+            <% (messages || []).forEach(m => { %>
+              <div class="d-flex mb-1 <%= m.direction === 'outgoing' ? 'justify-content-end' : 'justify-content-start' %>">
+                <div class="px-3 py-2 shadow-sm <%= m.direction === 'outgoing' ? 'msg-out' : 'msg-in' %>" style="max-width:65%;border-radius:8px;font-size:14.2px;line-height:1.4;position:relative;">
+                  <span><%= m.content?.text || '(media: '+ m.messageType +')' %></span>
+                  <span class="ms-2" style="font-size:11px;float:right;color:<%= m.direction === 'outgoing' ? 'rgba(255,255,255,0.7)' : '#667781' %>;margin-top:2px;">
+                    <%= new Date(m.createdAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) %>
+                    <% if (m.direction === 'outgoing') { %>
+                      <i class="fas fa-check" style="font-size:10px;margin-left:3px;color:<%= m.status === 'read' ? '#53bdeb' : m.status === 'delivered' ? '#fff' : 'rgba(255,255,255,0.6)' %>"></i>
+                    <% } %>
+                  </span>
+                </div>
+              </div>
+            <% }) %>
+          </div>
+          <div class="flex-shrink-0 px-3 py-2 d-flex align-items-center position-relative" style="background:#f0f2f5;">
+            <form onsubmit="return sendReply(event)" class="w-100 d-flex align-items-center gap-1" id="replyForm">
+              <div class="dropdown" id="attachDropdown">
+                <button type="button" class="btn px-2" data-bs-toggle="dropdown" style="background:transparent;color:#667781;border-radius:50%;font-size:20px;"><i class="fas fa-plus-circle"></i></button>
+                <div class="dropdown-menu dropdown-menu-start p-2 shadow" style="min-width:auto;border-radius:12px;">
+                  <div class="d-flex gap-1">
+                    <button type="button" class="btn btn-light rounded-3 p-2 text-center" style="width:60px" onclick="pickMedia('image')"><i class="fas fa-image fa-lg" style="color:#00a884"></i><br><small>Image</small></button>
+                    <button type="button" class="btn btn-light rounded-3 p-2 text-center" style="width:60px" onclick="pickMedia('video')"><i class="fas fa-video fa-lg" style="color:#5c6bc0"></i><br><small>Video</small></button>
+                    <button type="button" class="btn btn-light rounded-3 p-2 text-center" style="width:60px" onclick="pickMedia('audio')"><i class="fas fa-microphone fa-lg" style="color:#e91e63"></i><br><small>Voice</small></button>
+                    <button type="button" class="btn btn-light rounded-3 p-2 text-center" style="width:60px" onclick="pickMedia('document')"><i class="fas fa-file fa-lg" style="color:#ff9800"></i><br><small>Doc</small></button>
+                  </div>
+                </div>
+              </div>
+              <input type="file" id="attachFile" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" style="display:none" onchange="onFilePicked()">
+              <div class="flex-grow-1 position-relative">
+                <input type="text" id="replyText" class="form-control border-0 shadow-sm" placeholder="Type a message" style="border-radius:8px;padding:10px 12px;font-size:15px;padding-right:40px">
+                <span id="fileBadge" style="display:none;position:absolute;left:8px;top:50%;transform:translateY(-50%);background:#d9fdd3;border-radius:12px;padding:2px 10px;font-size:12px;max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                  <span id="fileBadgeText"></span>
+                  <i class="fas fa-times ms-1" onclick="cancelFile()" style="cursor:pointer;color:#e91e63;font-size:10px"></i>
+                </span>
+              </div>
+              <div class="position-relative">
+                <button type="button" class="btn px-2" onclick="toggleEmoji()" style="background:transparent;color:#667781;border-radius:50%;font-size:20px;"><i class="fas fa-smile"></i></button>
+                <div id="emojiPicker" style="display:none;position:absolute;bottom:50px;right:0;width:320px;height:260px;overflow-y:auto;background:#fff;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.15);padding:8px;z-index:9999;font-size:24px;"></div>
+              </div>
+              <button type="submit" class="btn px-2" style="background:transparent;color:#00a884;border-radius:50%;font-size:22px;"><i class="fas fa-paper-plane"></i></button>
+            </form>
+          </div>
+        <% } else { %>
+          <div class="d-flex align-items-center justify-content-center h-100" style="background:#f0f2f5;">
+            <div class="text-center text-muted">
+              <i class="fas fa-comment-dots" style="font-size:6rem;color:#00a884;"></i>
+              <h5 class="mt-3 fw-normal">WhatsApp Web</h5>
+              <p style="font-size:14px;">Send and receive messages in real time</p>
+            </div>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+  <%- include('../partials/footer') %>
+</div>
+<script>
+function changeInstance(id) { window.location.href = '?instanceId=' + id; }
+function filterContacts(q) {
+  document.querySelectorAll('.contact-row').forEach(r => {
+    r.style.display = r.textContent.toLowerCase().includes(q.toLowerCase()) ? '' : 'none';
+  });
+}
+const EMOJIS = Array.from('😀😂😍🤔😎🙄😢😡👍👎🙌👏🎉❤️💔🔥⭐☀️🌙🌸🍕🎂🚀💯✨🥰😘🤗😊🥺😅🤣😇🙃😏😒😩😤😱🤩🥳😈💀👻🎃💩👋🤝✌️🤞💪👀👅💋👑🐶🐱🐼🐸🐝🌻🍀🌈⚡🌊🔥❄️🎵🎶🎸🎮📱💻⌚🎁🎈📷🔑💡📚💰🔔⏰🚀✈️🏠🏁🏆🥇🥈🥉⚽🏀🎯🛒🧠💊🩸🧬🔬💉🛡️🗡️🔧🔨⚙️🧲🧪📡🔭🪐');
+
+(function() {
+  const picker = document.getElementById('emojiPicker');
+  if (!picker) return;
+  for (let i = 0; i < EMOJIS.length; i += 6) {
+    const row = document.createElement('div');
+    for (let j = i; j < i + 6 && j < EMOJIS.length; j++) {
+      const span = document.createElement('span');
+      span.className = 'emoji-item';
+      span.textContent = EMOJIS[j];
+      span.onclick = () => insertEmoji(span.textContent);
+      row.appendChild(span);
+    }
+    picker.appendChild(row);
+  }
+})();
+
+let attachType = null;
+
+function pickMedia(type) {
+  attachType = type;
+  const acceptMap = { image:'image/*', video:'video/*', audio:'audio/*', document:'.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar' };
+  const inp = document.getElementById('attachFile');
+  inp.accept = acceptMap[type] || '*';
+  inp.value = '';
+  inp.click();
+  document.querySelector('#attachDropdown .dropdown-menu')?.classList.remove('show');
+  document.querySelector('#attachDropdown [data-bs-toggle="dropdown"]')?.setAttribute('aria-expanded','false');
+}
+
+function onFilePicked() {
+  const file = document.getElementById('attachFile').files[0];
+  if (!file) return;
+  document.getElementById('fileBadgeText').textContent = (attachType==='image'?'📷 ':attachType==='video'?'🎥 ':attachType==='audio'?'🎵 ':'📎 ')+ file.name;
+  const badge = document.getElementById('fileBadge');
+  badge.style.display = 'block';
+  document.getElementById('replyText').style.paddingLeft = badge.offsetWidth + 20 + 'px';
+}
+
+function clearFileInput() {
+  document.getElementById('attachFile').value = '';
+  document.getElementById('fileBadge').style.display = 'none';
+  document.getElementById('replyText').style.paddingLeft = '12px';
+  document.getElementById('replyText').value = '';
+  attachType = null;
+}
+
+function cancelFile() { clearFileInput(); }
+
+function toggleEmoji() {
+  const p = document.getElementById('emojiPicker');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+function insertEmoji(e) {
+  const inp = document.getElementById('replyText');
+  inp.value += e;
+  inp.focus();
+}
+
+document.addEventListener('click', function(e) {
+  const p = document.getElementById('emojiPicker');
+  if (p && !e.target.closest('#emojiPicker') && !e.target.closest('button[onclick*="toggleEmoji"]')) {
+    p.style.display = 'none';
+  }
+});
+
+function sendReply(e) {
+  e.preventDefault();
+  const file = document.getElementById('attachFile').files[0];
+  const text = document.getElementById('replyText').value.trim();
+  if (!text && !file) return;
+  const contact = '<%= activeContact %>';
+  const isGroup = contact.includes('@g.us');
+
+  if (file) {
+    const fd = new FormData();
+    fd.append('instanceId', '<%= selectedInstance %>');
+    fd.append('to', contact);
+    fd.append('type', attachType || 'document');
+    fd.append('media', file);
+    if (text) fd.append('caption', text);
+    fetch('/messages/send', { method:'POST', headers:{'x-csrf-token':csrfToken,'Accept':'application/json'}, body: fd })
+      .then(r=>r.json()).then(d=>{
+        if(d.success) { clearFileInput(); location.reload(); }
+        else Swal.fire('Error',d.message,'error');
+      }).catch(e=>{clearFileInput();Swal.fire('Error',e.message,'error');});
+  } else {
+    const url = isGroup ? '/groups/send' : '/messages/send';
+    const body = isGroup
+      ? JSON.stringify({ instanceId:'<%= selectedInstance %>', groupJid: contact, text })
+      : JSON.stringify({ instanceId:'<%= selectedInstance %>', to: contact, text, type:'text' });
+    api(url, { method:'POST', body })
+      .then(r=>r.json()).then(d=>{
+        if(d.success) { document.getElementById('replyText').value=''; location.reload(); }
+        else Swal.fire('Error',d.message,'error');
+      }).catch(e=>Swal.fire('Error',e.message,'error'));
+  }
+}
+</script>

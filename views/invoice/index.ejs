@@ -1,0 +1,32 @@
+<%- include('../partials/header') %>
+<%- include('../partials/sidebar') %>
+<div class="main-content">
+  <%- include('../partials/navbar') %>
+  <div class="content p-7 m-4">
+    <h4 class="mb-3">My Invoices</h4>
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 datatable">
+            <thead class="table-light">
+              <tr><th>Invoice #</th><th>Plan</th><th>Amount</th><th>Status</th><th>Date</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+              <% (invoices || []).forEach(inv => { %>
+                <tr>
+                  <td><code><%= inv.invoiceNumber %></code></td>
+                  <td><%= inv.items?.[0]?.description || inv.subscription?.plan?.name || '—' %></td>
+                  <td>₹<%= inv.total.toLocaleString() %></td>
+                  <td><span class="badge bg-<%= inv.status === 'paid' ? 'success' : inv.status === 'pending' ? 'warning' : 'danger' %>"><%= inv.status %></span></td>
+                  <td><%= new Date(inv.createdAt).toLocaleDateString() %></td>
+                  <td><a href="/invoices/<%= inv._id %>/pdf" class="btn btn-sm btn-secondary"><i class="fas fa-download"></i> PDF</a></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <%- include('../partials/footer') %>
+</div>

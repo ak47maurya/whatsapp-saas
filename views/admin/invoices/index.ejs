@@ -1,0 +1,50 @@
+<%- include('../../partials/header') %>
+<%- include('../../partials/sidebar') %>
+<div class="main-content">
+  <%- include('../../partials/navbar') %>
+  <div class="content p-7 m-4">
+    <h4 class="mb-3">Invoice Management</h4>
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 datatable">
+            <thead class="table-light">
+              <tr><th>Invoice #</th><th>User</th><th>Amount</th><th>Status</th><th>Payment</th><th>Date</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+              <% (invoices || []).forEach(inv => { %>
+                <tr>
+                  <td><code><%= inv.invoiceNumber %></code></td>
+                  <td><%= inv.user?.name || inv.user?.email || '—' %></td>
+                  <td>₹<%= inv.total.toLocaleString() %></td>
+                  <td><span class="badge bg-<%= inv.status === 'paid' ? 'success' : inv.status === 'pending' ? 'warning' : inv.status === 'failed' ? 'danger' : 'secondary' %>"><%= inv.status %></span></td>
+                  <td><span class="badge bg-info"><%= inv.paymentMethod || 'manual' %></span></td>
+                  <td><%= new Date(inv.createdAt).toLocaleDateString() %></td>
+                  <td nowrap>
+                    <% if (inv.status === 'pending') { %>
+                      <button onclick="markPaid('<%= inv._id %>')" class="btn btn-sm btn-success"><i class="fas fa-check"></i> Paid</button>
+                    <% } %>
+                    <a href="/admin/invoices/<%= inv._id %>/pdf" class="btn btn-sm btn-secondary"><i class="fas fa-download"></i> PDF</a>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <%- include('../../partials/footer') %>
+</div>
+
+<script>
+function markPaid(id) {
+  Swal.fire({ title:'Mark as Paid?', icon:'question', showCancelButton:true })
+    .then(r => {
+      if (!r.isConfirmed) return;
+      fetch('/admin/invoices/'+id+'/pay', { method:'POST', headers:{'x-csrf-token':csrfToken,'Accept':'application/json'} })
+        .then(r=>r.json())
+        .then(d => { if(d.success) Swal.fire('Done','Invoice marked paid','success').then(()=>location.reload()); else Swal.fire('Error',d.message,'error'); });
+    });
+}
+</script>

@@ -1,0 +1,32 @@
+<%- include('../../partials/header') %>
+<%- include('../../partials/sidebar') %>
+<div class="main-content">
+  <%- include('../../partials/navbar') %>
+  <div class="content p-7 m-4">
+    <h4 class="mb-3">Activity Log</h4>
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 datatable">
+            <thead class="table-light">
+              <tr><th>User</th><th>Action</th><th>Category</th><th>Description</th><th>Severity</th><th>Date</th></tr>
+            </thead>
+            <tbody>
+              <% (logs || []).forEach(l => { %>
+                <tr>
+                  <td><%= l.user?.name || 'System' %></td>
+                  <td><code><%= l.action %></code></td>
+                  <td><span class="badge bg-info"><%= l.category %></span></td>
+                  <td><%= l.description %></td>
+                  <td><span class="badge bg-<%= l.severity === 'critical' ? 'danger' : l.severity === 'error' ? 'warning' : l.severity === 'warning' ? 'secondary' : 'success' %>"><%= l.severity %></span></td>
+                  <td><%= new Date(l.createdAt).toLocaleString() %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <%- include('../../partials/footer') %>
+</div>

@@ -1,0 +1,120 @@
+<%- include('../partials/header') %>
+<div class="container py-5">
+  <div class="text-center mb-5">
+    <h2>Choose Your Plan</h2>
+    <p class="text-muted">Select the plan that best fits your needs</p>
+  </div>
+
+  <div class="card shadow-sm mb-5">
+    <div class="card-header bg-dark text-white"><h5 class="mb-0">Definitions / Feature Guide</h5></div>
+    <div class="card-body">
+      <div class="row">
+        <div class="col-md-6">
+          <dl class="mb-0">
+            <dt><i class="fas fa-tag text-success me-1"></i> Price</dt>
+            <dd class="text-muted ms-3 mb-2">Price of the plan as listed.</dd>
+            <dt><i class="fas fa-calendar-alt text-success me-1"></i> Validity</dt>
+            <dd class="text-muted ms-3 mb-2">Every plan has one-year validity (365 days from activation).</dd>
+            <dt><i class="fas fa-sms text-success me-1"></i> WhatsApp SMS</dt>
+            <dd class="text-muted ms-3 mb-2">Every month, the user can send up to X WhatsApp messages as per the plan limit.</dd>
+            <dt><i class="fas fa-user-circle text-success me-1"></i> WhatsApp Profile</dt>
+            <dd class="text-muted ms-3 mb-2">User can add up to X different WhatsApp profiles (instances).</dd>
+            <dt><i class="fas fa-code text-success me-1"></i> WhatsApp Business API</dt>
+            <dd class="text-muted ms-3 mb-2">Enables automation and integration via REST API.</dd>
+            <dt><i class="fas fa-bullhorn text-success me-1"></i> Bulk WhatsApp Messaging</dt>
+            <dd class="text-muted ms-3 mb-2">Send bulk WhatsApp messages to multiple clients at once.</dd>
+          </dl>
+        </div>
+        <div class="col-md-6">
+          <dl class="mb-0">
+            <dt><i class="fas fa-file-image text-success me-1"></i> Media Messages</dt>
+            <dd class="text-muted ms-3 mb-2">Send media files (images, videos, documents) via WhatsApp.</dd>
+            <dt><i class="fas fa-robot text-success me-1"></i> Chatbot</dt>
+            <dd class="text-muted ms-3 mb-2">Keyword-based auto-reply chatbot for automated customer responses.</dd>
+            <dt><i class="fas fa-file-excel text-success me-1"></i> Excel Import</dt>
+            <dd class="text-muted ms-3 mb-2">Import contacts via Excel file or manual copy-paste.</dd>
+            <dt><i class="fas fa-tag text-success me-1"></i> Dynamic Messaging</dt>
+            <dd class="text-muted ms-3 mb-2">Send personalised WhatsApp messages using variables from imported Excel data. E.g. "Hello Akshay, you scored English – 98, Science – 86." Each SMS is unique.</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-white"><h5 class="mb-0">Feature Comparison</h5></div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-bordered mb-0 text-center align-middle">
+          <thead class="table-light">
+            <tr>
+              <th class="text-start" style="min-width:200px">Feature</th>
+              <% (plans || []).forEach(plan => { %>
+                <th><%= plan.name %><br><small class="text-muted">₹<%= plan.price.toLocaleString() %>/<%= plan.validity %>d</small></th>
+              <% }) %>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="text-start fw-medium">Price</td><% (plans || []).forEach(plan => { %><td>₹<%= plan.price.toLocaleString() %></td><% }) %></tr>
+            <tr><td class="text-start fw-medium">Validity</td><% (plans || []).forEach(plan => { %><td><%= plan.validity %> days</td><% }) %></tr>
+            <tr><td class="text-start fw-medium">WhatsApp Profiles</td><% (plans || []).forEach(plan => { %><td><%= plan.features.whatsappInstances === -1 ? 'Unlimited' : plan.features.whatsappInstances %></td><% }) %></tr>
+            <tr><td class="text-start fw-medium">Daily Messages</td><% (plans || []).forEach(plan => { %><td><%= plan.features.dailyMessageLimit === -1 ? 'Unlimited' : plan.features.dailyMessageLimit.toLocaleString() %></td><% }) %></tr>
+            <tr><td class="text-start fw-medium">Monthly Messages</td><% (plans || []).forEach(plan => { %><td><%= plan.features.monthlyMessageLimit === -1 ? 'Unlimited' : plan.features.monthlyMessageLimit.toLocaleString() %></td><% }) %></tr>
+            <tr><td class="text-start fw-medium">Media Messages</td><% (plans || []).forEach(plan => { %><td><%- plan.features.mediaMessaging ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>' %></td><% }) %></tr>
+            <tr><td class="text-start fw-medium">WhatsApp Business API</td><% (plans || []).forEach(plan => { %><td><%- plan.features.apiAccess ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>' %></td><% }) %></tr>
+            <tr><td class="text-start fw-medium">Bulk WhatsApp Messaging</td><% (plans || []).forEach(plan => { %><td><%- plan.features.bulkMessaging ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>' %></td><% }) %></tr>
+            <tr><td class="text-start fw-medium">Webhook Access</td><% (plans || []).forEach(plan => { %><td><%- plan.features.webhookAccess ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>' %></td><% }) %></tr>
+            <tr><td class="text-start fw-medium">Campaign Access</td><% (plans || []).forEach(plan => { %><td><%- plan.features.campaignAccess ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>' %></td><% }) %></tr>
+            <tr><td class="text-start fw-medium">Chatbot</td><% (plans || []).forEach(plan => { %><td><%- plan.features.chatbot ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>' %></td><% }) %></tr>
+            <tr><td class="text-start fw-medium">Dynamic Messaging</td><% (plans || []).forEach(plan => { %><td><%- plan.features.dynamicMessaging ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>' %></td><% }) %></tr>
+            <tr><td class="text-start fw-medium">Excel Import</td><% (plans || []).forEach(plan => { %><td><%- plan.features.exportData ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>' %></td><% }) %></tr>
+            <tr><td class="text-start fw-medium">Outgoing Messages</td><% (plans || []).forEach(plan => { %><td><%- plan.features.outgoingMessages ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>' %></td><% }) %></tr>
+            <tr><td class="text-start fw-medium">Incoming Messages</td><% (plans || []).forEach(plan => { %><td><%- plan.features.incomingMessages ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>' %></td><% }) %></tr>
+            <tr><td class="text-start fw-medium">Groups Limit</td><% (plans || []).forEach(plan => { %><td><%= plan.features.groupsLimit === -1 ? 'Unlimited' : plan.features.groupsLimit %></td><% }) %></tr>
+            <tr><td class="text-start fw-medium">Contacts Limit</td><% (plans || []).forEach(plan => { %><td><%= plan.features.contactsLimit === -1 ? 'Unlimited' : plan.features.contactsLimit.toLocaleString() %></td><% }) %></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 justify-content-center">
+    <% (plans || []).forEach(plan => { %>
+      <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100 <%= plan.metadata?.highlight ? 'border-success border-2' : '' %>">
+          <% if (plan.metadata?.badge) { %><div class="card-header text-center bg-success text-white"><%= plan.metadata.badge %></div><% } %>
+          <div class="card-body text-center">
+            <h5 class="card-title"><%= plan.name %></h5>
+            <h2 class="text-success">₹<%= plan.price.toLocaleString() %><small class="text-muted fs-6">/<%= plan.validity %> days</small></h2>
+            <hr>
+            <ul class="list-unstyled text-start small">
+              <li class="mb-1"><i class="<%= plan.features.whatsappInstances > 0 ? 'fas fa-check text-success' : plan.features.whatsappInstances === -1 ? 'fas fa-infinity text-success' : 'fas fa-times text-danger' %> me-2"></i><% if(plan.features.whatsappInstances === -1){ %>Unlimited<% } else { %><%= plan.features.whatsappInstances %><% } %> WhatsApp Profile(s)</li>
+              <li class="mb-1"><i class="<%= plan.features.dailyMessageLimit > 0 ? 'fas fa-check text-success' : plan.features.dailyMessageLimit === -1 ? 'fas fa-infinity text-success' : 'fas fa-times text-danger' %> me-2"></i><% if(plan.features.dailyMessageLimit === -1){ %>Unlimited<% } else { %><%= plan.features.dailyMessageLimit %><% } %> Daily Messages</li>
+              <li class="mb-1"><i class="<%= plan.features.monthlyMessageLimit > 0 ? 'fas fa-check text-success' : plan.features.monthlyMessageLimit === -1 ? 'fas fa-infinity text-success' : 'fas fa-times text-danger' %> me-2"></i><% if(plan.features.monthlyMessageLimit === -1){ %>Unlimited<% } else { %><%= plan.features.monthlyMessageLimit %><% } %> Monthly Messages</li>
+              <li class="mb-1"><i class="<%= plan.features.mediaMessaging ? 'fas fa-check text-success' : 'fas fa-times text-danger' %> me-2"></i>Media Messages</li>
+              <li class="mb-1"><i class="<%= plan.features.apiAccess ? 'fas fa-check text-success' : 'fas fa-times text-danger' %> me-2"></i>WhatsApp Business API</li>
+              <li class="mb-1"><i class="<%= plan.features.bulkMessaging ? 'fas fa-check text-success' : 'fas fa-times text-danger' %> me-2"></i>Bulk WhatsApp Messaging</li>
+              <li class="mb-1"><i class="<%= plan.features.chatbot ? 'fas fa-check text-success' : 'fas fa-times text-danger' %> me-2"></i>Chatbot</li>
+              <li class="mb-1"><i class="<%= plan.features.exportData ? 'fas fa-check text-success' : 'fas fa-times text-danger' %> me-2"></i>Excel Import</li>
+              <li class="mb-1"><i class="<%= plan.features.dynamicMessaging ? 'fas fa-check text-success' : 'fas fa-times text-danger' %> me-2"></i>Dynamic Messaging</li>
+              <li class="mb-1"><i class="<%= (plan.features.outgoingMessages && plan.features.incomingMessages) ? 'fas fa-check text-success' : 'fas fa-times text-danger' %> me-2"></i>Incoming/Outgoing Messages</li>
+
+            </ul>
+            <% if (isAuthenticated) { %>
+              <button onclick="subscribe('<%= plan._id %>')" class="btn btn-success w-100">Get Started</button>
+            <% } else { %>
+              <a href="/auth/register" class="btn btn-success w-100">Get Started</a>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+</div>
+<script>
+function subscribe(planId) {
+  fetch('/subscriptions', { method:'POST', headers:{'x-csrf-token':csrfToken,'Content-Type':'application/json','Accept':'application/json'}, body:JSON.stringify({planId}) })
+    .then(r=>r.json()).then(d=>{ if(d.success) { Swal.fire('Success','Subscription activated!','success').then(()=>window.location.href='/dashboard'); } else Swal.fire('Error',d.message,'error'); });
+}
+</script>
+<%- include('../partials/footer') %>

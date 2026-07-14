@@ -1,0 +1,126 @@
+<%- include('../partials/header') %>
+<%- include('../partials/sidebar') %>
+<div class="main-content">
+  <%- include('../partials/navbar') %>
+  <div class="content p-7 m-4">
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body d-flex justify-content-between align-items-center">
+        <h4 class="mb-0"><i class="fas fa-users text-success me-2"></i>Bulk Messages</h4>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <form id="bulkForm">
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">WhatsApp Instance</label>
+              <select name="instanceId" class="form-select" required>
+                <option value="">— Select Instance —</option>
+                <% (instances || []).filter(i => i.status === 'connected').forEach(i => { %>
+                  <option value="<%= i._id %>"><%= i.name %> (<%= i.phone %>)</option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Message Type</label>
+              <select name="type" class="form-select" id="msgType" onchange="toggleFields()">
+                <option value="text">Text</option>
+                <option value="image">Image</option>
+                <option value="video">Video</option>
+                <option value="audio">Audio</option>
+                <option value="document">Document</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Recipients <small class="text-muted">(one phone number per line)</small></label>
+            <textarea name="recipients" class="form-control" rows="5" placeholder="918765250157&#10;919876543210&#10;918765432109" required></textarea>
+          </div>
+
+          <div class="mb-3" id="textSection">
+            <label class="form-label fw-semibold">Message Text</label>
+            <textarea name="text" class="form-control" rows="3" placeholder="Enter your message..." maxlength="4096"></textarea>
+          </div>
+
+          <div class="mb-3" id="mediaSection" style="display:none">
+            <label class="form-label fw-semibold">Media File</label>
+            <input type="file" name="media" class="form-control">
+          </div>
+
+          <div class="mb-3" id="captionSection" style="display:none">
+            <label class="form-label fw-semibold">Caption</label>
+            <textarea name="caption" class="form-control" rows="2" placeholder="Media caption..."></textarea>
+          </div>
+
+          <div class="row mb-3">
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Delay Type</label>
+              <select name="delayType" class="form-select" onchange="toggleDelay()">
+                <option value="fixed">Fixed Delay</option>
+                <option value="random">Random Delay</option>
+              </select>
+            </div>
+            <div class="col-md-4" id="fixedDelayGroup">
+              <label class="form-label fw-semibold">Delay (ms)</label>
+              <input type="number" name="fixedDelay" class="form-control" value="2000" min="500" step="500">
+            </div>
+            <div class="col-md-4" id="randomDelayGroup" style="display:none">
+              <label class="form-label fw-semibold">Min - Max (ms)</label>
+              <div class="input-group">
+                <input type="number" name="minDelay" class="form-control" value="1000" min="500" step="500">
+                <span class="input-group-text">-</span>
+                <input type="number" name="maxDelay" class="form-control" value="5000" min="1000" step="500">
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-success btn-lg px-4"><i class="fas fa-paper-plane me-1"></i> Send Bulk</button>
+            <button type="reset" class="btn btn-outline-secondary btn-lg px-4"><i class="fas fa-undo me-1"></i> Reset</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  <%- include('../partials/footer') %>
+</div>
+
+<script>
+function toggleFields() {
+  const type = document.getElementById('msgType').value;
+  document.getElementById('textSection').style.display = type === 'text' ? 'block' : 'block';
+  document.getElementById('mediaSection').style.display = ['image','video','audio','document'].includes(type) ? 'block' : 'none';
+  document.getElementById('captionSection').style.display = ['image','video'].includes(type) ? 'block' : 'none';
+}
+function toggleDelay() {
+  const dt = document.querySelector('[name=delayType]').value;
+  document.getElementById('fixedDelayGroup').style.display = dt === 'fixed' ? 'block' : 'none';
+  document.getElementById('randomDelayGroup').style.display = dt === 'random' ? 'block' : 'none';
+}
+
+document.getElementById('bulkForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const btn = this.querySelector('button[type=submit]');
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Sending...';
+
+  const formData = new FormData(this);
+  const recipientsRaw = formData.get('recipients').split('\n').map(s => s.trim()).filter(Boolean);
+  formData.delete('recipients');
+  recipientsRaw.forEach((r, i) => formData.append('recipients', r));
+
+  fetch('/messages/bulk', { method:'POST', headers:{'x-csrf-token':csrfToken,'Accept':'application/json'}, body: formData })
+    .then(r => r.json())
+    .then(d => {
+      if (d.success) {
+        Swal.fire({ icon:'success', title:'Queued!', text: d.message || 'Messages queued', didClose:()=>{ window.location.href='/messages/bulk-list'; } });
+        this.reset();
+      } else {
+        Swal.fire({ icon:'error', title:'Error', text: d.message });
+      }
+    })
+    .catch(e => Swal.fire({ icon:'error', title:'Error', text: e.message }))
+    .finally(() => { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane me-1"></i> Send Bulk'; });
+});
+</script>
