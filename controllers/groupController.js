@@ -53,8 +53,8 @@ export const fetchGroups = async (req, res) => {
     });
     if (!instance) return errorResponse(res, 'Instance not found or not connected', 404);
 
-    const sock = whatsappService.getSocket(instanceId);
-    if (!sock) return errorResponse(res, 'Socket not available', 400);
+    const sock = await whatsappService.ensureSocket(instanceId);
+    if (!sock) return errorResponse(res, 'Instance not connected', 400);
 
     const groups = await sock.groupFetchAllParticipating();
     const groupList = Object.values(groups);

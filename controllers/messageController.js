@@ -199,7 +199,7 @@ export const sendBulk = async (req, res) => {
 
     if (!instance) return errorResponse(res, 'Instance not found', 404);
 
-    const sock = whatsappService.getSocket(instanceId);
+    const sock = await whatsappService.ensureSocket(instanceId);
     if (!sock) return errorResponse(res, 'Instance not connected. Please reconnect via QR scan.', 400);
 
     // Normalize recipients

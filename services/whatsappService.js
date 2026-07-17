@@ -55,6 +55,24 @@ export const getSocket = (instanceId) => {
   return instance?.sock || null;
 };
 
+export const ensureSocket = async (instanceId) => {
+  const instance = getManagedInstance(instanceId);
+  if (instance?.sock) return instance.sock;
+
+  const instDoc = await Instance.findById(instanceId).select('status');
+  if (!instDoc || instDoc.status !== 'connected') return null;
+
+  logger.info(`ensureSocket: instance ${instanceId} connected in DB but not in memory, reconnecting...`);
+  try {
+    const inst = createInstance(instanceId);
+    await inst.init(false);
+    return inst.sock;
+  } catch (err) {
+    logger.error(`ensureSocket failed for ${instanceId}: ${err.message}`);
+    return null;
+  }
+};
+
 export const resetStaleConnections = async () => {
   try {
     const staleInstances = await Instance.find({ status: 'connected', isDeleted: false });
