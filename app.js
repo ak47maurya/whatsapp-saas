@@ -17,8 +17,22 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+app.set('trust proxy', 1);
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
+
+// India timezone helper for all views
+const IST = 'en-IN';
+app.locals.formatDate = (date, style = 'full') => {
+  if (!date) return '—';
+  const d = new Date(date);
+  const opts = style === 'date'
+    ? { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' }
+    : style === 'time'
+    ? { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' }
+    : { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' };
+  return d.toLocaleString(IST, opts);
+};
 
 app.use(securityHeaders);
 app.use(cors({

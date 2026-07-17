@@ -1,6 +1,7 @@
 import User from '../models/User.js';
 import Subscription from '../models/Subscription.js';
 import ActivityLog from '../models/ActivityLog.js';
+import MediaFile from '../models/MediaFile.js';
 import { successResponse, errorResponse, paginatedResponse } from '../utils/response.js';
 
 export const index = async (req, res) => {
@@ -243,6 +244,51 @@ export const adminActivity = async (req, res) => {
       logs,
       activePage: 'admin-activity',
     });
+  } catch (error) {
+    errorResponse(res, error.message, 500);
+  }
+};
+
+export const clearUserData = async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    const target = await User.findById(targetId);
+    if (!target) return errorResponse(res, 'User not found', 404);
+
+    if (target.role === 'super_admin') {
+      return errorResponse(res, 'Cannot clear Super Admin data', 403);
+    }
+
+    const fs = (await import('fs/promises')).default;
+    const path = (await import('path')).default;
+    const Message = (await import('../models/Message.js')).default;
+
+    // Delete media files from disk
+    const mediaFiles = await MediaFile.find({ user: targetId });
+    const mediaDir = path.join(process.cwd(), 'public', 'media');
+    let diskDeleted = 0;
+    for (const m of mediaFiles) {
+      try {
+        if (m.filePath) { await fs.unlink(path.join(mediaDir, m.filePath)); diskDeleted++; }
+        if (m.thumbPath) await fs.unlink(path.join(mediaDir, m.thumbPath)).catch(() => {});
+      } catch {}
+    }
+
+    // Delete ALL DB records (sent, failed, cancelled — sab)
+    const [msgDeleted, mediaDeleted] = await Promise.all([
+      Message.deleteMany({ user: targetId }),
+      MediaFile.deleteMany({ user: targetId }),
+    ]);
+
+    await ActivityLog.create({
+      user: req.userId,
+      action: 'user.clear_data',
+      category: 'user',
+      description: `Cleared ${msgDeleted.deletedCount} messages & ${mediaDeleted.deletedCount} media files (${diskDeleted} from disk) for user: ${target.email}`,
+      severity: 'warning',
+    });
+
+    successResponse(res, { messagesDeleted: msgDeleted.deletedCount, mediaDeleted: mediaDeleted.deletedCount }, 'User data cleared');
   } catch (error) {
     errorResponse(res, error.message, 500);
   }

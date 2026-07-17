@@ -63,6 +63,7 @@
                       <button onclick="changePlan('<%= u._id %>')" class="btn btn-sm btn-primary" title="Change Plan"><i class="fas fa-exchange-alt"></i></button>
                       <% if (u.status === 'active') { %><button onclick="suspendUser('<%= u._id %>')" class="btn btn-sm btn-warning" title="Suspend"><i class="fas fa-pause"></i></button><% } %>
                       <% if (u.status !== 'active') { %><button onclick="activateUser('<%= u._id %>')" class="btn btn-sm btn-success" title="Activate"><i class="fas fa-play"></i></button><% } %>
+                      <% if (user?.role === 'super_admin') { %><button onclick="clearUserData('<%= u._id %>','<%= u.name %>')" class="btn btn-sm btn-outline-danger" title="Clear Messages & Media"><i class="fas fa-eraser"></i></button><% } %>
                       <button onclick="deleteUser('<%= u._id %>')" class="btn btn-sm btn-danger" title="Delete"><i class="fas fa-trash"></i></button>
                     <% } else { %>
                       <span class="text-muted small">—</span>
@@ -307,5 +308,9 @@ document.getElementById('changePlanForm').addEventListener('submit', function(e)
 });
 function suspendUser(id) { Swal.fire({title:'Suspend?',icon:'warning',showCancelButton:true}).then(r=>{if(r.isConfirmed)api('/users/'+id+'/suspend',{method:'PUT'}).then(r=>r.json()).then(d=>{if(d.success)location.reload();else Swal.fire('Error',d.message,'error');});}); }
 function activateUser(id) { Swal.fire({title:'Activate?',icon:'question',showCancelButton:true}).then(r=>{if(r.isConfirmed)api('/users/'+id+'/activate',{method:'PUT'}).then(r=>r.json()).then(d=>{if(d.success)location.reload();else Swal.fire('Error',d.message,'error');});}); }
+function clearUserData(id, name) {
+  Swal.fire({title:'Clear all data for '+name+'?',text:'Messages & media files will be permanently deleted!',icon:'warning',showCancelButton:true,confirmButtonColor:'#dc3545',confirmButtonText:'Yes, clear everything'})
+    .then(r=>{if(r.isConfirmed)api('/users/'+id+'/clear-data',{method:'POST'}).then(r=>r.json()).then(d=>{if(d.success)Swal.fire('Done','Deleted '+d.data.messagesDeleted+' messages & '+d.data.mediaDeleted+' media files','success').then(()=>location.reload());else Swal.fire('Error',d.message,'error');});});
+}
 function deleteUser(id) { Swal.fire({title:'Delete forever?',icon:'warning',showCancelButton:true}).then(r=>{if(r.isConfirmed)api('/users/'+id,{method:'DELETE'}).then(r=>r.json()).then(d=>{if(d.success)location.reload();else Swal.fire('Error',d.message,'error');});}); }
 </script>

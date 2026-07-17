@@ -45,7 +45,7 @@ export const login = async (req, res) => {
     if (req.xhr || req.headers.accept?.includes('json')) {
       return successResponse(res, { user, token }, 'Login successful');
     }
-    res.redirect('/dashboard');
+    req.session.save(() => res.redirect('/dashboard'));
   } catch (error) {
     if (req.xhr || req.headers.accept?.includes('json')) {
       return errorResponse(res, error.message, 401);

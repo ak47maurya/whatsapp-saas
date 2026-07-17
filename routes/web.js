@@ -93,6 +93,7 @@ router.get('/users/:id', authorize('super_admin', 'admin'), userController.show)
 router.put('/users/:id', authorize('super_admin', 'admin'), userController.update);
 router.put('/users/:id/suspend', authorize('super_admin', 'admin'), userController.suspend);
 router.put('/users/:id/activate', authorize('super_admin', 'admin'), userController.activate);
+router.post('/users/:id/clear-data', authorize('super_admin'), userController.clearUserData);
 router.delete('/users/:id', authorize('super_admin', 'admin'), userController.remove);
 router.get('/users/:userId/activity', authorize('super_admin', 'admin'), userController.getActivityLogs);
 

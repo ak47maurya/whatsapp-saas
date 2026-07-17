@@ -1,3 +1,5 @@
+process.env.TZ = 'Asia/Kolkata';
+
 import http from 'http';
 import app from './app.js';
 import config from './config/index.js';

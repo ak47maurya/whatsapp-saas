@@ -218,7 +218,7 @@ export const updateSettings = async (req, res) => {
     );
     if (!instance) return errorResponse(res, 'Instance not found', 404);
 
-    const allowedSettings = ['autoReconnect', 'syncFullHistory', 'markReadOnSend', 'webhookUrl', 'delay', 'groupIgnore', 'readReceipts'];
+    const allowedSettings = ['autoReconnect', 'syncFullHistory', 'markReadOnSend', 'webhookUrl', 'messageDelay', 'groupIgnore', 'readReceipts'];
     for (const key of Object.keys(req.body)) {
       if (allowedSettings.includes(key)) {
         instance.settings[key] = req.body[key];

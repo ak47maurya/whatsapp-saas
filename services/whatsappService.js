@@ -27,6 +27,8 @@ import { processAutoReply } from './autoReplyService.js';
 
 const activeConnections = new Map();
 const connectionLocks = new Map();
+const reconnectAttempts = new Map();
+const connectionStableSince = new Map();
 
 export const getAuthPath = (instanceId) => {
   return path.join(config.rootDir, config.baileys.authDir, String(instanceId));
@@ -55,6 +57,14 @@ export const generateQR = async (instanceId) => {
     const { state, saveCreds } = await useMultiFileAuthState(authPath);
     const { version } = await fetchLatestBaileysVersion();
 
+    // Close existing connection if any before creating new one
+    const existing = activeConnections.get(strId);
+    if (existing?.socket) {
+      try { existing.socket.end(undefined); } catch {}
+      try { existing.socket.ws?.close(); } catch {}
+      activeConnections.delete(strId);
+    }
+
     const sock = makeWASocket({
       version,
       browser: Browsers.windows('Chrome'),
@@ -64,6 +74,7 @@ export const generateQR = async (instanceId) => {
       markOnlineOnConnect: true,
       logger: baileysLogger,
       generateHighQualityLink: true,
+      shouldReconnect: () => false,
     });
 
     instance.status = 'connecting';
@@ -108,6 +119,7 @@ export const generateQR = async (instanceId) => {
 
         if (connection === 'open') {
           clearTimeout(timeout);
+          connectionStableSince.set(strId, Date.now());
           const profile = {
             name: sock.user?.name || '',
             about: '',
@@ -147,11 +159,22 @@ export const generateQR = async (instanceId) => {
 
         if (connection === 'close') {
           clearTimeout(timeout);
-          const shouldReconnect = (lastDisconnect?.error) instanceof Boom
-            ? lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut
-            : true;
 
-          if (shouldReconnect) {
+          // Log actual disconnect reason
+          let reasonCode = 'unknown';
+          let reasonMsg = 'Unknown';
+          if (lastDisconnect?.error instanceof Boom) {
+            reasonCode = lastDisconnect.error?.output?.statusCode;
+            reasonMsg = DisconnectReason[reasonCode] || `Code ${reasonCode}`;
+          } else if (lastDisconnect?.error) {
+            reasonMsg = lastDisconnect.error.message || String(lastDisconnect.error);
+          }
+          logger.info(`Instance ${strId} disconnected — reason: ${reasonMsg}`);
+
+          const isLoggedOut = lastDisconnect?.error instanceof Boom
+            && lastDisconnect.error?.output?.statusCode === DisconnectReason.loggedOut;
+
+          if (!isLoggedOut) {
             instance.status = 'disconnected';
             instance.lastDisconnected = new Date();
             await instance.save();
@@ -168,13 +191,43 @@ export const generateQR = async (instanceId) => {
               instanceId: strId,
             });
 
-            logger.info(`Instance ${strId} disconnected, reconnecting...`);
-
-            if (instance.settings?.autoReconnect) {
-              setTimeout(() => generateQR(strId), 5000);
+            // Track flapping — reset counter only if connection was stable 30+ sec
+            const stableSince = connectionStableSince.get(strId);
+            const wasStable = stableSince && (Date.now() - stableSince > 30000);
+            if (!wasStable && reconnectAttempts.has(strId)) {
+              // keep existing counter (flapping)
+            } else {
+              reconnectAttempts.delete(strId);
             }
-            reject(new Error('Connection closed, reconnecting...'));
+            connectionStableSince.delete(strId);
+
+            const attempt = (reconnectAttempts.get(strId) || 0) + 1;
+            reconnectAttempts.set(strId, attempt);
+
+            // After 3 rapid disconnects, stop & set error
+            if (attempt > 3) {
+              instance.status = 'error';
+              instance.lastDisconnected = new Date();
+              await instance.save();
+              logger.info(`Instance ${strId} flapping — stopped after ${attempt} disconnects. Set status to error.`);
+              reconnectAttempts.delete(strId);
+              reject(new Error(`Connection unstable (${reasonMsg}). Retry manually.`));
+              return;
+            }
+
+            const delay = Math.min(10000 * attempt, 60000); // exponential backoff: 10s, 20s, 30s max 60s
+            logger.info(`Instance ${strId} reconnecting in ${delay}ms (attempt ${attempt})...`);
+
+            if (instance.settings?.autoReconnect !== false) {
+              setTimeout(() => {
+                generateQR(strId).catch(err => {
+                  logger.error(`Reconnect failed for ${strId}: ${err.message}`);
+                });
+              }, delay);
+            }
+            reject(new Error(`Connection closed: ${reasonMsg}`));
           } else {
+            reconnectAttempts.delete(strId);
             instance.status = 'disconnected';
             instance.lastDisconnected = new Date();
             await instance.save();
@@ -396,14 +449,14 @@ export const resetStaleConnections = async () => {
       const authPath = getAuthPath(String(inst._id));
       try {
         await fs.access(authPath);
-        // Auth data exists, try reconnecting
         logger.info(`Auto-reconnecting instance ${inst._id}...`);
         generateQR(inst._id).catch(err => {
           logger.error(`Auto-reconnect failed for ${inst._id}: ${err.message}`);
           Instance.findByIdAndUpdate(inst._id, { status: 'disconnected', lastDisconnected: new Date() }).catch(() => {});
         });
+        // Stagger reconnections to avoid simultaneous connections
+        await new Promise(r => setTimeout(r, 3000));
       } catch {
-        // No auth data, mark disconnected
         await Instance.findByIdAndUpdate(inst._id, { status: 'disconnected', lastDisconnected: new Date() });
         logger.info(`Marked stale instance ${inst._id} as disconnected (no auth data)`);
       }
@@ -418,8 +471,9 @@ export const resetStaleConnections = async () => {
 
 export const sendMessage = async (instanceId, to, content, type = 'text') => {
   const sock = getSocket(instanceId);
-  if (!sock) {
+  if (!sock || sock.ws?.readyState !== 1) {
     await Instance.findByIdAndUpdate(instanceId, { status: 'disconnected', lastDisconnected: new Date() });
+    activeConnections.delete(String(instanceId));
     throw new Error('Instance not connected. Please reconnect via QR scan.');
   }
 

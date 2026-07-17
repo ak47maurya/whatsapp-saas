@@ -111,6 +111,7 @@ export const initializeCronJobs = async () => {
     }
   });
 
+  // Auto-reconnect tracking (actual reconnect handled by whatsappService disconnect handler)
   cron.schedule('*/5 * * * *', async () => {
     try {
       const disconnected = await Instance.find({
@@ -121,10 +122,10 @@ export const initializeCronJobs = async () => {
           $lt: new Date(Date.now() - 5 * 60 * 1000),
           $ne: null,
         },
-      }).limit(10);
+      }).countDocuments();
 
-      for (const instance of disconnected) {
-        logger.info(`Auto-reconnecting instance ${instance._id}`);
+      if (disconnected > 0) {
+        logger.debug(`Auto-reconnect: ${disconnected} instance(s) pending reconnect`);
       }
     } catch (err) {
       logger.error('Auto-reconnect check error:', err);

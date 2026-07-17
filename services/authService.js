@@ -19,9 +19,7 @@ export const registerUser = async ({ name, email, password }) => {
     name,
     email,
     password,
-    emailVerificationToken: verificationToken,
-    emailVerificationExpires: verificationExpires,
-    status: 'pending',
+    status: 'active',
   });
 
   const verificationUrl = `${config.app.url}/auth/verify-email/${verificationToken}`;
