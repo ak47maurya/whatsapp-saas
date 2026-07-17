@@ -686,23 +686,12 @@ export const startHealthCheck = () => {
       try {
         const sock = conn?.socket;
         if (sock && sock.ws?.readyState !== 1) {
-          logger.info(`Health check: instance ${strId} socket dead, cleaning up`);
+          logger.warn(`Health check: instance ${strId} socket dead in activeConnections`);
           activeConnections.delete(strId);
           const redis = getRedisClient();
           await redis.del(getConnectionKey(strId));
-          const instance = await Instance.findById(strId);
-          if (instance && instance.status === 'connected') {
-            instance.status = 'disconnected';
-            instance.lastDisconnected = new Date();
-            await instance.save();
-            if (instance.settings?.autoReconnect !== false) {
-              generateQR(strId).catch(err => {
-                logger.error(`Health check reconnect failed for ${strId}: ${err.message}`);
-              });
-            }
-          }
         }
       } catch {}
     }
-  }, 30000);
+  }, 60000);
 };
