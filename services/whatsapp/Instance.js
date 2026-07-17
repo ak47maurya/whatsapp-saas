@@ -35,6 +35,7 @@ class WhatsAppInstance {
     this._initLock = false;
     this._disconnectTimestamps = [];
     this._reconnectTimer = null;
+    this._sockGen = 0;
   }
 
   get authPath() {
@@ -67,7 +68,10 @@ class WhatsAppInstance {
         if (this.sock) {
           try { this.sock.end(undefined); } catch {}
           try { this.sock.ws?.close(); } catch {}
+          await new Promise(r => setTimeout(r, 2000));
         }
+
+        const gen = ++this._sockGen;
 
         this.sock = makeWASocket({
           version,
@@ -93,6 +97,8 @@ class WhatsAppInstance {
         }, 30000);
 
         this.sock.ev.on('connection.update', async (update) => {
+          if (gen !== this._sockGen) return;
+
           const { connection, lastDisconnect, qr } = update;
 
           if (qr && forQR) {
@@ -191,7 +197,7 @@ class WhatsAppInstance {
             }
 
             if (instance.settings?.autoReconnect !== false) {
-              const delay = 2000;
+              const delay = 5000;
               logger.info(`Instance ${this.strId} reconnecting in ${delay}ms...`);
               this._reconnectTimer = setTimeout(() => {
                 this._reconnectTimer = null;
@@ -205,10 +211,12 @@ class WhatsAppInstance {
         });
 
         this.sock.ev.on('messages.upsert', async (msgEvent) => {
+          if (gen !== this._sockGen) return;
           await this._handleMessages(msgEvent);
         });
 
         this.sock.ev.on('messages.update', async (updates) => {
+          if (gen !== this._sockGen) return;
           await this._handleMessageUpdates(updates);
         });
       } catch (err) {
