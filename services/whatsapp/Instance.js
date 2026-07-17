@@ -30,9 +30,9 @@ class WhatsAppInstance {
     this.sock = null;
     this.authState = null;
     this.saveCreds = null;
-    this.reconnectAttempt = 0;
     this.connectedSince = null;
     this._initLock = false;
+    this._disconnectTimestamps = [];
   }
 
   get authPath() {
@@ -120,7 +120,6 @@ class WhatsAppInstance {
           if (connection === 'open') {
             clearTimeout(timeout);
             this.connectedSince = Date.now();
-            this.reconnectAttempt = 0;
             await this._onConnected(instance);
             this._initLock = false;
             resolve({ status: 'connected' });
@@ -142,7 +141,6 @@ class WhatsAppInstance {
               && lastDisconnect.error?.output?.statusCode === DisconnectReason.loggedOut;
 
             if (isLoggedOut) {
-              this.reconnectAttempt = 0;
               instance.status = 'disconnected';
               instance.lastDisconnected = new Date();
               await instance.save();
@@ -176,26 +174,28 @@ class WhatsAppInstance {
             const redis = getRedisClient();
             await redis.del(this.redisKey);
 
-            if (this.connectedSince && (Date.now() - this.connectedSince) > 60000) {
-              this.reconnectAttempt = 0;
-            }
-            this.reconnectAttempt++;
+            const now = Date.now();
+            this._disconnectTimestamps.push(now);
+            this._disconnectTimestamps = this._disconnectTimestamps.filter(t => now - t < 60000);
 
-            if (this.reconnectAttempt > 5) {
+            if (this._disconnectTimestamps.length > 5) {
               instance.status = 'error';
               instance.lastDisconnected = new Date();
               await instance.save();
-              logger.info(`Instance ${this.strId} flapping — stopped after ${this.reconnectAttempt} disconnects`);
-              this.reconnectAttempt = 0;
+              logger.info(`Instance ${this.strId} flapping — stopped after ${this._disconnectTimestamps.length} disconnects in 60s`);
+              this._disconnectTimestamps = [];
               reject(new Error(`Connection unstable (${reasonMsg}). Retry manually.`));
               return;
             }
 
             if (instance.settings?.autoReconnect !== false) {
-              logger.info(`Instance ${this.strId} reconnecting immediately (attempt ${this.reconnectAttempt})...`);
-              this.init(false).catch(err => {
-                logger.error(`Reconnect failed for ${this.strId}: ${err.message}`);
-              });
+              const delay = 2000;
+              logger.info(`Instance ${this.strId} reconnecting in ${delay}ms...`);
+              setTimeout(() => {
+                this.init(false).catch(err => {
+                  logger.error(`Reconnect failed for ${this.strId}: ${err.message}`);
+                });
+              }, delay);
             }
             reject(new Error(`Connection closed: ${reasonMsg}`));
           }
@@ -451,7 +451,6 @@ class WhatsAppInstance {
       this.sock?.ws?.close();
     } catch {}
     this.sock = null;
-    this.reconnectAttempt = 0;
     this.connectedSince = null;
 
     const redis = getRedisClient();
@@ -466,7 +465,6 @@ class WhatsAppInstance {
       this.sock?.end(undefined);
     } catch {}
     this.sock = null;
-    this.reconnectAttempt = 0;
     this.connectedSince = null;
 
     const authPath = this.authPath;
