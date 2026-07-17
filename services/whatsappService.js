@@ -29,6 +29,7 @@ const activeConnections = new Map();
 const connectionLocks = new Map();
 const reconnectAttempts = new Map();
 const connectionStableSince = new Map();
+const reconnectTimeouts = new Map();
 
 export const getAuthPath = (instanceId) => {
   return path.join(config.rootDir, config.baileys.authDir, String(instanceId));
@@ -218,12 +219,19 @@ export const generateQR = async (instanceId) => {
             const delay = Math.min(10000 * attempt, 60000); // exponential backoff: 10s, 20s, 30s max 60s
             logger.info(`Instance ${strId} reconnecting in ${delay}ms (attempt ${attempt})...`);
 
+            // Cancel any pending reconnect for this instance
+            if (reconnectTimeouts.has(strId)) {
+              clearTimeout(reconnectTimeouts.get(strId));
+            }
+
             if (instance.settings?.autoReconnect !== false) {
-              setTimeout(() => {
+              const tid = setTimeout(() => {
+                reconnectTimeouts.delete(strId);
                 generateQR(strId).catch(err => {
                   logger.error(`Reconnect failed for ${strId}: ${err.message}`);
                 });
               }, delay);
+              reconnectTimeouts.set(strId, tid);
             }
             reject(new Error(`Connection closed: ${reasonMsg}`));
           } else {
@@ -396,6 +404,11 @@ export const disconnectInstance = async (instanceId) => {
     activeConnections.delete(strId);
   }
 
+  if (reconnectTimeouts.has(strId)) {
+    clearTimeout(reconnectTimeouts.get(strId));
+    reconnectTimeouts.delete(strId);
+  }
+
   const redis = getRedisClient();
   await redis.del(getConnectionKey(strId));
 
@@ -417,6 +430,11 @@ export const logoutInstance = async (instanceId) => {
       connection.socket?.end(undefined);
     } catch {}
     activeConnections.delete(strId);
+  }
+
+  if (reconnectTimeouts.has(strId)) {
+    clearTimeout(reconnectTimeouts.get(strId));
+    reconnectTimeouts.delete(strId);
   }
 
   const authPath = getAuthPath(strId);
@@ -474,12 +492,23 @@ export const sendMessage = async (instanceId, to, content, type = 'text') => {
   if (!sock || sock.ws?.readyState !== 1) {
     logger.info(`sendMessage: instance ${instanceId} socket dead, attempting reconnect...`);
     activeConnections.delete(String(instanceId));
+    // Cancel any pending reconnect timeout to avoid races
+    const strId = String(instanceId);
+    if (reconnectTimeouts.has(strId)) {
+      clearTimeout(reconnectTimeouts.get(strId));
+      reconnectTimeouts.delete(strId);
+    }
     try {
-      const result = await generateQR(String(instanceId));
+      const result = await generateQR(strId);
       if (result.status !== 'connected') {
         throw new Error('Reconnect did not return connected status');
       }
-      sock = getSocket(instanceId);
+      // Retry getting the socket with delays — it may take a moment to stabilize
+      for (let i = 0; i < 5; i++) {
+        sock = getSocket(instanceId);
+        if (sock && sock.ws?.readyState === 1) break;
+        await new Promise(r => setTimeout(r, 500));
+      }
       if (!sock || sock.ws?.readyState !== 1) {
         throw new Error('Socket still not connected after reconnect');
       }
