@@ -1,0 +1,24 @@
+export const getMessageType = (message) => {
+  if (!message) return 'unknown';
+  if (message.conversation) return 'text';
+  if (message.extendedTextMessage) return 'text';
+  if (message.imageMessage) return 'image';
+  if (message.videoMessage) return 'video';
+  if (message.audioMessage) return 'audio';
+  if (message.documentMessage) return 'document';
+  if (message.stickerMessage) return 'sticker';
+  if (message.locationMessage) return 'location';
+  if (message.contactMessage) return 'contact';
+  if (message.contactsArrayMessage) return 'contacts';
+  if (message.listMessage) return 'list';
+  if (message.buttonsMessage) return 'buttons';
+  if (message.templateMessage) return 'template';
+  if (message.orderMessage) return 'order';
+  if (message.productMessage) return 'product';
+  if (message.paymentMessage) return 'payment';
+  if (message.protocolMessage) return 'protocol';
+  if (message.reactionMessage) return 'reaction';
+  if (message.groupInviteMessage) return 'group_invite';
+  if (message.callLogMessage) return 'call_log';
+  return 'unknown';
+};
