@@ -1,7 +1,7 @@
 import DynamicMessaging from '../models/DynamicMessaging.js';
 import Message from '../models/Message.js';
 import ActivityLog from '../models/ActivityLog.js';
-import { getSocket, sendMessage } from './whatsappService.js';
+import { sendMessage } from './whatsappService.js';
 import logger from '../utils/logger.js';
 
 const activeSenders = new Map();
@@ -34,19 +34,6 @@ async function processSend(dmId, signal) {
     dm.status = 'processing';
     await dm.save();
 
-    const sock = getSocket(String(dm.instance));
-    if (!sock) {
-      dm.status = 'cancelled';
-      for (const c of dm.contacts) {
-        if (c.status === 'pending') { c.status = 'failed'; c.error = 'Instance not connected'; }
-      }
-      dm.failedCount = dm.contacts.filter(c => c.status === 'failed').length;
-      await dm.save();
-      return;
-    }
-
-    const ownPhone = sock.authState?.creds?.me?.id?.split(':')[0]?.split('@')[0] || '';
-
     for (let i = 0; i < dm.contacts.length; i++) {
       const c = dm.contacts[i];
       if (c.status !== 'pending') continue;
@@ -67,7 +54,7 @@ async function processSend(dmId, signal) {
           instance: dm.instance,
           messageType: 'text',
           direction: 'outgoing',
-          from: ownPhone,
+          from: result?.from || '',
           to: c.phone,
           content: { text: personalized },
           status: 'sent',

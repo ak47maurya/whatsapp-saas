@@ -2,7 +2,7 @@ import BulkMessage from '../models/BulkMessage.js';
 import Message from '../models/Message.js';
 import Instance from '../models/Instance.js';
 import ActivityLog from '../models/ActivityLog.js';
-import { getSocket, sendMessage } from './whatsappService.js';
+import { sendMessage } from './whatsappService.js';
 import logger from '../utils/logger.js';
 
 const activeSenders = new Map();
@@ -40,21 +40,6 @@ async function processBulk(bulkId, signal) {
     bulk.status = 'processing';
     await bulk.save();
 
-    const sock = getSocket(String(bulk.instance));
-    if (!sock) {
-      bulk.status = 'cancelled';
-      bulk.failedCount = bulk.pendingCount;
-      bulk.pendingCount = 0;
-      for (const r of bulk.recipients) {
-        if (r.status === 'pending') {
-          r.status = 'failed';
-          r.error = 'Instance not connected';
-        }
-      }
-      await bulk.save();
-      return;
-    }
-
     for (let i = 0; i < bulk.recipients.length; i++) {
       const r = bulk.recipients[i];
       if (r.status !== 'pending') continue;
@@ -73,14 +58,12 @@ async function processBulk(bulkId, signal) {
         bulk.sentCount = (bulk.sentCount || 0) + 1;
         bulk.pendingCount = Math.max(0, (bulk.pendingCount || 0) - 1);
 
-        const ownPhone = sock.authState?.creds?.me?.id?.split(':')[0]?.split('@')[0] || '';
-
         await Message.create({
           user: bulk.user,
           instance: bulk.instance,
           messageType: bulk.messageType || 'text',
           direction: 'outgoing',
-          from: ownPhone,
+          from: result?.from || '',
           to: r.phone,
           content: bulk.content,
           status: 'sent',

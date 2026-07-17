@@ -111,12 +111,6 @@ async function processNext(instanceId) {
     await new Promise(resolve => setTimeout(resolve, delayMs));
 
     try {
-      const sock = getSocket(instanceId);
-      if (!sock) {
-        await Message.findByIdAndUpdate(job.msgId, { status: 'failed', errorMessage: 'Instance not connected', failedAt: new Date() });
-        continue;
-      }
-
       await sendMessage(instanceId, job.to, job.content, job.messageType);
 
       const sentMsg = await Message.findByIdAndUpdate(job.msgId, { status: 'sent', sentAt: new Date() }, { new: true });
