@@ -19,7 +19,8 @@ export const getConnectionKey = (instanceId) => {
 
 export const generateQR = async (instanceId) => {
   const instance = createInstance(instanceId);
-  return instance.init(true);
+  await instance.init(true);
+  return Instance.findById(instanceId);
 };
 
 export const disconnectInstance = async (instanceId) => {
