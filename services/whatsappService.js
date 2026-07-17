@@ -470,11 +470,24 @@ export const resetStaleConnections = async () => {
 };
 
 export const sendMessage = async (instanceId, to, content, type = 'text') => {
-  const sock = getSocket(instanceId);
+  let sock = getSocket(instanceId);
   if (!sock || sock.ws?.readyState !== 1) {
-    await Instance.findByIdAndUpdate(instanceId, { status: 'disconnected', lastDisconnected: new Date() });
+    logger.info(`sendMessage: instance ${instanceId} socket dead, attempting reconnect...`);
     activeConnections.delete(String(instanceId));
-    throw new Error('Instance not connected. Please reconnect via QR scan.');
+    try {
+      const result = await generateQR(String(instanceId));
+      if (result.status !== 'connected') {
+        throw new Error('Reconnect did not return connected status');
+      }
+      sock = getSocket(instanceId);
+      if (!sock || sock.ws?.readyState !== 1) {
+        throw new Error('Socket still not connected after reconnect');
+      }
+      logger.info(`sendMessage: instance ${instanceId} reconnected, retrying message`);
+    } catch (err) {
+      await Instance.findByIdAndUpdate(instanceId, { status: 'disconnected', lastDisconnected: new Date() });
+      throw new Error(`Instance not connected. Reconnect failed: ${err.message}`);
+    }
   }
 
   const jid = to.includes('@') ? to : `${to}@s.whatsapp.net`;
@@ -666,3 +679,30 @@ const generateVCard = (contact) => {
 };
 
 export const getActiveConnectionCount = () => activeConnections.size;
+
+export const startHealthCheck = () => {
+  setInterval(async () => {
+    for (const [strId, conn] of activeConnections.entries()) {
+      try {
+        const sock = conn?.socket;
+        if (sock && sock.ws?.readyState !== 1) {
+          logger.info(`Health check: instance ${strId} socket dead, cleaning up`);
+          activeConnections.delete(strId);
+          const redis = getRedisClient();
+          await redis.del(getConnectionKey(strId));
+          const instance = await Instance.findById(strId);
+          if (instance && instance.status === 'connected') {
+            instance.status = 'disconnected';
+            instance.lastDisconnected = new Date();
+            await instance.save();
+            if (instance.settings?.autoReconnect !== false) {
+              generateQR(strId).catch(err => {
+                logger.error(`Health check reconnect failed for ${strId}: ${err.message}`);
+              });
+            }
+          }
+        }
+      } catch {}
+    }
+  }, 30000);
+};

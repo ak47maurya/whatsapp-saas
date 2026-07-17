@@ -6,7 +6,7 @@ import config from './config/index.js';
 import connectDatabase from './config/database.js';
 import { createRedisClient } from './config/redis.js';
 import { initializeSocket } from './sockets/index.js';
-import { resetStaleConnections } from './services/whatsappService.js';
+import { resetStaleConnections, startHealthCheck } from './services/whatsappService.js';
 import { initializeCronJobs } from './jobs/cron.js';
 import { initMediaDir } from './services/mediaStorage.js';
 import logger from './utils/logger.js';
@@ -26,6 +26,7 @@ const startServer = async () => {
     }
 
     await initMediaDir();
+    startHealthCheck();
     initializeCronJobs();
 
     const PORT = config.port;
