@@ -20,6 +20,7 @@ import { triggerWebhook } from '../webhookService.js';
 import { processAutoReply } from '../autoReplyService.js';
 import { getMessageType } from './messageTypes.js';
 import { saveMedia } from '../mediaStorage.js';
+import { isLidUser } from '@whiskeysockets/baileys';
 
 baileysLogger.level = 'silent';
 
@@ -274,6 +275,12 @@ class WhatsAppInstance {
         if (msgType === 'protocol' || msgType === 'unknown') continue;
 
         let displayFrom = remoteJid;
+        if (isLidUser(remoteJid)) {
+          try {
+            const pnUser = await this.sock?.signalRepository?.lidMapping?.getPNForLID(remoteJid);
+            if (pnUser) displayFrom = pnUser + '@s.whatsapp.net';
+          } catch {}
+        }
         const ownPhone = this.sock?.authState?.creds?.me?.id?.split(':')[0]?.split('@')[0] || instance.phone || this.sock?.user?.id?.split(':')[0] || '';
 
         const messageData = {
