@@ -33,6 +33,7 @@ class WhatsAppInstance {
     this.connectedSince = null;
     this._initLock = false;
     this._disconnectTimestamps = [];
+    this._reconnectTimer = null;
   }
 
   get authPath() {
@@ -191,7 +192,8 @@ class WhatsAppInstance {
             if (instance.settings?.autoReconnect !== false) {
               const delay = 2000;
               logger.info(`Instance ${this.strId} reconnecting in ${delay}ms...`);
-              setTimeout(() => {
+              this._reconnectTimer = setTimeout(() => {
+                this._reconnectTimer = null;
                 this.init(false).catch(err => {
                   logger.error(`Reconnect failed for ${this.strId}: ${err.message}`);
                 });
@@ -361,6 +363,10 @@ class WhatsAppInstance {
 
   async sendMessage(to, content, type = 'text') {
     if (!this.sock) {
+      if (this._reconnectTimer) {
+        clearTimeout(this._reconnectTimer);
+        this._reconnectTimer = null;
+      }
       logger.info(`sendMessage: instance ${this.strId} socket dead, attempting reconnect...`);
       try {
         await this.init(false);
@@ -446,6 +452,10 @@ class WhatsAppInstance {
   }
 
   async disconnect() {
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
     try {
       this.sock?.end(undefined);
       this.sock?.ws?.close();
@@ -460,6 +470,10 @@ class WhatsAppInstance {
   }
 
   async logout() {
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
     try {
       this.sock?.logout('Logged out by user');
       this.sock?.end(undefined);
