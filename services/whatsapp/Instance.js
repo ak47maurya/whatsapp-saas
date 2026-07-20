@@ -406,6 +406,14 @@ class WhatsAppInstance {
         clearTimeout(this._reconnectTimer);
         this._reconnectTimer = null;
       }
+
+      try {
+        await fs.access(this.authPath);
+      } catch {
+        await Instance.findByIdAndUpdate(this.instanceId, { status: 'disconnected', lastDisconnected: new Date() });
+        throw new Error('Instance disconnected — reconnect manually');
+      }
+
       logger.info(`sendMessage: instance ${this.strId} socket dead, attempting reconnect...`);
       try {
         await this.init(false);
