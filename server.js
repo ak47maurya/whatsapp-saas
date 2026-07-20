@@ -1,5 +1,9 @@
 process.env.TZ = 'Asia/Kolkata';
 
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Rejection:', reason);
+});
+
 import http from 'http';
 import app from './app.js';
 import config from './config/index.js';

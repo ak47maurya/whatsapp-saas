@@ -107,7 +107,7 @@ class WhatsAppInstance {
 
         this.sock.ev.on('connection.update', async (update) => {
           if (gen !== this._sockGen) return;
-
+          try {
           const { connection, lastDisconnect, qr } = update;
 
           if (qr && forQR) {
@@ -241,16 +241,19 @@ class WhatsAppInstance {
             }
             done(new Error(`Connection closed: ${reasonMsg}`));
           }
+        } catch (err) {
+          logger.error(`Connection update error for ${this.strId}: ${err.message}`);
+        }
         });
 
         this.sock.ev.on('messages.upsert', async (msgEvent) => {
           if (gen !== this._sockGen) return;
-          await this._handleMessages(msgEvent);
+          try { await this._handleMessages(msgEvent); } catch (err) { logger.error(`Message upsert error for ${this.strId}: ${err.message}`); }
         });
 
         this.sock.ev.on('messages.update', async (updates) => {
           if (gen !== this._sockGen) return;
-          await this._handleMessageUpdates(updates);
+          try { await this._handleMessageUpdates(updates); } catch (err) { logger.error(`Message update error for ${this.strId}: ${err.message}`); }
         });
       } catch (err) {
         this._initLock = false;
