@@ -61,7 +61,18 @@ export const getSocket = (instanceId) => {
 export const ensureSocket = async (instanceId) => {
   const instance = getManagedInstance(instanceId);
   if (instance?.sock) return instance.sock;
-  return null;
+
+  const instDoc = await Instance.findById(instanceId).select('status');
+  if (!instDoc || instDoc.status !== 'connected') return null;
+
+  const inst = createInstance(instanceId);
+  try {
+    await inst.init(false);
+    return inst.sock;
+  } catch (err) {
+    logger.error(`ensureSocket failed for ${instanceId}: ${err.message}`);
+    return null;
+  }
 };
 
 export const resetStaleConnections = async () => {
