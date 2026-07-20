@@ -147,6 +147,7 @@ class WhatsAppInstance {
 
             const isLoggedOut = lastDisconnect?.error instanceof Boom
               && lastDisconnect.error?.output?.statusCode === DisconnectReason.loggedOut;
+            const isReplaced = reasonCode === DisconnectReason.connectionReplaced;
 
             if (isLoggedOut) {
               instance.status = 'disconnected';
@@ -160,6 +161,28 @@ class WhatsAppInstance {
                 });
               }
               reject(new Error('Logged out'));
+              return;
+            }
+
+            if (isReplaced) {
+              instance.status = 'disconnected';
+              instance.lastDisconnected = new Date();
+              await instance.save();
+              this.sock = null;
+              try { await fs.rm(this.authPath, { recursive: true, force: true }); } catch {}
+              const io = getIO();
+              if (io) {
+                io.to(`user:${instance.user}`).emit('instance:disconnected', {
+                  instanceId: this.strId, reason: 'connection_replaced',
+                });
+              }
+              await triggerWebhook(instance.user, instance._id, 'instance.disconnected', {
+                instanceId: this.strId, reason: 'connection_replaced',
+              });
+              const redis = getRedisClient();
+              await redis.del(this.redisKey);
+              logger.info(`Instance ${this.strId} connection replaced — auth cleared, no auto-reconnect`);
+              reject(new Error('Connection replaced by another session'));
               return;
             }
 
