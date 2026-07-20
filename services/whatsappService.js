@@ -18,6 +18,8 @@ export const getConnectionKey = (instanceId) => {
 };
 
 export const generateQR = async (instanceId) => {
+  const authPath = getAuthPath(instanceId);
+  try { await fs.rm(authPath, { recursive: true, force: true }); } catch {}
   const instance = createInstance(instanceId);
   await instance.init(true);
   return Instance.findById(instanceId);

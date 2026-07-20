@@ -154,6 +154,7 @@ class WhatsAppInstance {
               instance.lastDisconnected = new Date();
               await instance.save();
               this.sock = null;
+              try { await fs.rm(this.authPath, { recursive: true, force: true }); } catch {}
               const io = getIO();
               if (io) {
                 io.to(`user:${instance.user}`).emit('instance:disconnected', {
