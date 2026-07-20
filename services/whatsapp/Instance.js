@@ -112,7 +112,7 @@ class WhatsAppInstance {
           const { connection, lastDisconnect, qr } = update;
 
           if (qr && forQR) {
-            clearTimeout(timeout);
+            clearTimeout(initTimeout);
             const qrBase64 = await qrcode.toDataURL(qr);
             instance.qrCode = {
               code: qrBase64,
@@ -136,7 +136,7 @@ class WhatsAppInstance {
           }
 
           if (connection === 'open') {
-            clearTimeout(timeout);
+            clearTimeout(initTimeout);
             this.connectedSince = Date.now();
             await this._onConnected(instance);
             this._initLock = false;
@@ -144,7 +144,7 @@ class WhatsAppInstance {
           }
 
           if (connection === 'close') {
-            clearTimeout(timeout);
+            clearTimeout(initTimeout);
             this._initLock = false;
 
             const reasonCode = lastDisconnect?.error instanceof Boom
