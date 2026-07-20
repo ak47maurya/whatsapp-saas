@@ -37,6 +37,7 @@ export const authenticate = async (req, res, next) => {
     req.user = user;
     req.userId = user._id;
     req.token = token;
+    res.locals.token = token;
     next();
   } catch (error) {
     if (error.name === 'TokenExpiredError') {
@@ -57,6 +58,8 @@ export const optionalAuth = async (req, res, next) => {
       token = req.headers.authorization.split(' ')[1];
     } else if (req.session && req.session.token) {
       token = req.session.token;
+    } else if (req.cookies && req.cookies.token) {
+      token = req.cookies.token;
     }
 
     if (token) {
@@ -65,11 +68,13 @@ export const optionalAuth = async (req, res, next) => {
       if (user && user.status === 'active') {
         req.user = user;
         req.userId = user._id;
+        req.token = token;
+        res.locals.token = token;
       }
     }
-    } catch (err) {
-      logger.error('Optional auth error:', err);
-    } finally {
+  } catch (err) {
+    logger.error('Optional auth error:', err);
+  } finally {
     next();
   }
 };

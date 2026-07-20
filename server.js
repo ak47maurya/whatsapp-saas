@@ -1,5 +1,37 @@
 process.env.TZ = 'Asia/Kolkata';
 
+import dns from 'dns';
+
+const origLookup = dns.lookup;
+dns.lookup = (hostname, opts, cb) => {
+  if (typeof opts === 'function') { cb = opts; opts = {}; }
+  else if (typeof opts === 'number') { opts = { family: opts }; }
+  if (hostname.endsWith('.cloudflare-dns.com')) return origLookup(hostname, opts, cb);
+  const family = opts?.family || 0;
+  const doh = async () => {
+    if (family !== 6) {
+      const r = await fetch(`https://cloudflare-dns.com/dns-query?name=${hostname}&type=A`, {
+        headers: { Accept: 'application/dns-json' },
+        signal: AbortSignal.timeout(10000),
+      });
+      const d = await r.json();
+      const a = d?.Answer?.find(x => x.type === 1);
+      if (a) return cb(null, a.data, 4);
+    }
+    if (family !== 4) {
+      const r = await fetch(`https://cloudflare-dns.com/dns-query?name=${hostname}&type=AAAA`, {
+        headers: { Accept: 'application/dns-json' },
+        signal: AbortSignal.timeout(10000),
+      });
+      const d = await r.json();
+      const a = d?.Answer?.find(x => x.type === 28);
+      if (a) return cb(null, a.data, 6);
+    }
+    origLookup(hostname, opts, cb);
+  };
+  doh().catch(e => origLookup(hostname, opts, cb));
+};
+
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
 });

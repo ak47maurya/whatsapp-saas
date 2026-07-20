@@ -18,8 +18,11 @@ export const getConnectionKey = (instanceId) => {
 };
 
 export const generateQR = async (instanceId) => {
-  const authPath = getAuthPath(instanceId);
-  try { await fs.rm(authPath, { recursive: true, force: true }); } catch {}
+  const instDoc = await Instance.findById(instanceId);
+  if (instDoc && instDoc.status === 'connected') {
+    const mgr = getManagedInstance(instanceId);
+    if (mgr && mgr.sock && mgr.sock.ws?.readyState === 1) return instDoc;
+  }
   const instance = createInstance(instanceId);
   await instance.init(true);
   return Instance.findById(instanceId);
@@ -104,7 +107,13 @@ export const resetStaleConnections = async () => {
 export const sendMessage = async (instanceId, to, content, type = 'text') => {
   let instance = getManagedInstance(instanceId);
 
-  if (!instance || !instance.sock) {
+  if (!instance) {
+    throw new Error('Instance not connected. Reconnect manually from the web app.');
+  }
+  if (!instance.sock) {
+    if (instance._reconnectTimer) {
+      throw new Error('Instance is reconnecting. Please wait a moment and try again.');
+    }
     throw new Error('Instance not connected. Reconnect manually from the web app.');
   }
 

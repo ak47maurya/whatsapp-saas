@@ -50,6 +50,7 @@
 
 <script>
 const socket = io({ auth: { token: '<%= token || "" %>' } });
+socket.on('connect_error', (err) => { console.warn('Socket auth failed, using polling fallback:', err.message); });
 const instanceId = '<%= instance._id %>';
 
 // If already connected on page load, redirect after 2s
@@ -114,6 +115,17 @@ socket.on('instance:disconnected', (data) => {
   if (data.instanceId === instanceId) onDisconnected(instanceId);
 });
 
+socket.on('instance:reconnecting', (data) => {
+  if (data.instanceId === instanceId) {
+    const box = document.getElementById('statusBox');
+    if (box) {
+      box.className = 'alert alert-warning d-inline-block px-4';
+      document.getElementById('statusText').textContent = 'Reconnecting...';
+      document.getElementById('qrContainer').innerHTML = '<div class="spinner-border text-warning" role="status"></div><p class="mt-2 text-warning">Connection lost. Auto-reconnecting...</p>';
+    }
+  }
+});
+
 socket.on('instance:replaced', (data) => {
   if (data.instanceId === instanceId) {
     const box = document.getElementById('statusBox');
@@ -123,17 +135,59 @@ socket.on('instance:replaced', (data) => {
   }
 });
 
-// QR countdown & auto-refresh
+// QR countdown & smart refresh (don't reload page - that destroys the connection!)
 let countdown = 60;
-setInterval(() => {
+let refreshTimer;
+function startCountdown() {
+  if (refreshTimer) clearInterval(refreshTimer);
+  countdown = 60;
   const el = document.getElementById('countdown');
-  if (el) {
+  if (el) el.textContent = countdown;
+  refreshTimer = setInterval(async () => {
+    const el2 = document.getElementById('countdown');
+    if (!el2) return;
     countdown--;
-    el.textContent = countdown;
-    if (countdown <= 0) {
-      // Reload the page to get a fresh QR
-      window.location.reload();
+    el2.textContent = countdown;
+    if (countdown > 0) return;
+    clearInterval(refreshTimer);
+    // Check current status before refreshing QR
+    try {
+      const resp = await fetch('/instances/'+instanceId+'/status', { headers: { Accept: 'application/json' } });
+      const data = await resp.json();
+      if (data.success && data.data) {
+        const dbStatus = data.data.instance?.status;
+        if (dbStatus === 'connected') { onConnected(instanceId); return; }
+        if (dbStatus === 'disconnected' || dbStatus === 'error') {
+          document.getElementById('statusText').textContent = 'QR Expired';
+          document.getElementById('expiryInfo').innerHTML = 'QR expired. <button onclick="refreshQR()" class="btn btn-sm btn-success">Get New QR</button>';
+          return;
+        }
+      }
+    } catch {}
+    refreshQR();
+  }, 1000);
+}
+
+async function refreshQR() {
+  try {
+    document.getElementById('statusText').textContent = 'refreshing...';
+    const resp = await fetch('/instances/'+instanceId+'/reconnect', { method: 'POST', headers: { Accept: 'application/json' } });
+    const data = await resp.json();
+    if (data.success && data.data?.instance?.qrCode?.code) {
+      const inst = data.data.instance;
+      document.getElementById('qrContainer').innerHTML = '<img src="'+inst.qrCode.code+'" alt="QR Code" class="img-fluid" style="max-width:300px;border-radius:12px">';
+      document.getElementById('statusText').textContent = 'qr_ready';
+      document.getElementById('statusBox').className = 'alert alert-secondary d-inline-block px-4';
+      document.getElementById('expiryInfo').innerHTML = 'QR code expires in <span id="countdown">60</span>s';
+      startCountdown();
+    } else {
+      document.getElementById('statusText').textContent = 'error';
+      document.getElementById('expiryInfo').innerHTML = 'Failed to generate QR. <button onclick="refreshQR()" class="btn btn-sm btn-warning">Retry</button>';
     }
+  } catch (e) {
+    document.getElementById('expiryInfo').innerHTML = 'Failed to generate QR. <button onclick="refreshQR()" class="btn btn-sm btn-warning">Retry</button>';
   }
-}, 1000);
+}
+
+startCountdown();
 </script>

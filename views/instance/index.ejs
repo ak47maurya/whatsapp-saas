@@ -25,7 +25,7 @@
                   <h5 class="card-title mb-0"><%= inst.name %></h5>
                   <code class="small text-muted" style="font-size:11px"><%= inst._id %></code>
                   <% const rs = inst._realStatus || inst.status; %>
-                  <span class="badge bg-<%= rs === 'connected' ? 'success' : rs === 'qr_ready' ? 'info' : rs === 'connecting' ? 'warning' : 'secondary' %>"><%= rs %></span>
+                  <span class="badge bg-<%= rs === 'connected' ? 'success' : rs === 'reconnecting' ? 'warning' : rs === 'qr_ready' ? 'info' : rs === 'connecting' ? 'warning' : 'secondary' %>"><%= rs %></span>
                 </div>
                 <p class="card-text small text-muted"><i class="fas fa-phone me-1"></i><%= inst.phone || 'Not connected' %></p>
                 <p class="card-text small text-muted"><i class="fas fa-clock me-1"></i><%= inst.lastConnected ? new Date(inst.lastConnected).toLocaleString() : 'Never connected' %></p>
@@ -35,6 +35,9 @@
                   <%= d?.type === 'random' ? (d?.minDelay||1000)+'–'+(d?.maxDelay||5000)+'ms (random)' : (d?.fixedDelay||2000)+'ms (fixed)' %>
                 </div>
                 <div class="mt-3 d-flex gap-1 flex-wrap">
+                  <% if (rs === 'reconnecting') { %>
+                    <span class="badge bg-warning p-2"><i class="fas fa-sync fa-spin"></i> Reconnecting...</span>
+                  <% } %>
                   <% if (rs === 'disconnected' || rs === 'error') { %>
                     <a href="/instances/<%= inst._id %>/connect" class="btn btn-sm btn-success"><i class="fas fa-qrcode"></i> Connect QR</a>
                   <% } %>
@@ -114,6 +117,7 @@
 
 <script>
 const socket = io({ auth: { token: '<%= token || "" %>' } });
+socket.on('connect_error', (err) => { console.warn('Socket auth failed, page will auto-refresh for status updates:', err.message); });
 socket.on('instance:qr', (data) => { if(data.qr) Swal.fire({ title:'Scan QR', imageUrl: data.qr, imageWidth:300, text:'Scan with WhatsApp → Linked Devices' }); });
 socket.on('instance:connected', () => { location.reload(); });
 socket.on('instance:disconnected', () => { location.reload(); });

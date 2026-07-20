@@ -201,9 +201,17 @@ class WhatsAppInstance {
             }
 
             if (isRestartRequired) {
-              logger.info(`Instance ${this.strId} restartRequired — reconnecting immediately`);
+              ++this._sockGen;
+              this._initLock = false;
+              logger.info(`Instance ${this.strId} restartRequired — reconnecting`);
               this.sock = null;
-              const delay = 3000;
+              const io2 = getIO();
+              if (io2) {
+                io2.to(`user:${instance.user}`).emit('instance:reconnecting', {
+                  instanceId: this.strId, reason: 'restart_required',
+                });
+              }
+              const delay = 1000;
               this._reconnectTimer = setTimeout(() => {
                 this._reconnectTimer = null;
                 this.init(false).catch(err => {
@@ -214,14 +222,43 @@ class WhatsAppInstance {
               return;
             }
 
-            instance.status = 'disconnected';
+            this.sock = null;
+            const redis = getRedisClient();
+            await redis.del(this.redisKey);
+
+            const now = Date.now();
+            this._disconnectTimestamps.push(now);
+            this._disconnectTimestamps = this._disconnectTimestamps.filter(t => now - t < 60000);
+
+            // Auto-reconnect immediately — don't show 'disconnected' yet
+            if (instance.settings?.autoReconnect !== false && this._disconnectTimestamps.length <= 5) {
+              const delay = this._disconnectTimestamps.length <= 1 ? 500 : 3000;
+              logger.info(`Instance ${this.strId} reconnecting in ${delay}ms... (reason: ${reasonMsg})`);
+              // Emit 'reconnecting' so frontend shows waiting state instead of disconnected
+              const io2 = getIO();
+              if (io2) {
+                io2.to(`user:${instance.user}`).emit('instance:reconnecting', {
+                  instanceId: this.strId, reason: reasonMsg,
+                });
+              }
+              this._reconnectTimer = setTimeout(() => {
+                this._reconnectTimer = null;
+                this.init(false).catch(err => {
+                  logger.error(`Reconnect failed for ${this.strId}: ${err.message}`);
+                });
+              }, delay);
+              done(new Error(`Connection closed: ${reasonMsg}`));
+              return;
+            }
+
+            // No auto-reconnect or flapping detected — mark truly disconnected
+            instance.status = this._disconnectTimestamps.length > 5 ? 'error' : 'disconnected';
             instance.lastDisconnected = new Date();
             await instance.save();
-            this.sock = null;
 
-            const io = getIO();
-            if (io) {
-              io.to(`user:${instance.user}`).emit('instance:disconnected', {
+            const io3 = getIO();
+            if (io3) {
+              io3.to(`user:${instance.user}`).emit('instance:disconnected', {
                 instanceId: this.strId, reason: reasonMsg,
               });
             }
@@ -230,33 +267,11 @@ class WhatsAppInstance {
               instanceId: this.strId, reason: reasonMsg,
             });
 
-            const redis = getRedisClient();
-            await redis.del(this.redisKey);
-
-            const now = Date.now();
-            this._disconnectTimestamps.push(now);
-            this._disconnectTimestamps = this._disconnectTimestamps.filter(t => now - t < 60000);
-
             if (this._disconnectTimestamps.length > 5) {
-              instance.status = 'error';
-              instance.lastDisconnected = new Date();
-              await instance.save();
               logger.info(`Instance ${this.strId} flapping — stopped after ${this._disconnectTimestamps.length} disconnects in 60s`);
               this._disconnectTimestamps = [];
-              done(new Error(`Connection unstable (${reasonMsg}). Retry manually.`));
-              return;
             }
 
-            if (instance.settings?.autoReconnect !== false) {
-              const delay = 5000;
-              logger.info(`Instance ${this.strId} reconnecting in ${delay}ms...`);
-              this._reconnectTimer = setTimeout(() => {
-                this._reconnectTimer = null;
-                this.init(false).catch(err => {
-                  logger.error(`Reconnect failed for ${this.strId}: ${err.message}`);
-                });
-              }, delay);
-            }
             done(new Error(`Connection closed: ${reasonMsg}`));
           }
         } catch (err) {
