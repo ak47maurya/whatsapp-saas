@@ -8,6 +8,20 @@ export const index = async (req, res) => {
     const filter = { user: req.userId, isDeleted: false };
     const instances = await Instance.find(filter).sort({ createdAt: -1 });
 
+    const { getInstance } = await import('../services/whatsapp/Manager.js');
+    for (const inst of instances) {
+      if (inst.status === 'connected') {
+        const mgr = getInstance(inst._id);
+        if (!mgr || !mgr.sock || mgr.sock.ws?.readyState !== 1) {
+          inst._realStatus = 'disconnected';
+        } else {
+          inst._realStatus = 'connected';
+        }
+      } else {
+        inst._realStatus = inst.status;
+      }
+    }
+
     res.render('instance/index', {
       title: 'My Instances',
       instances,

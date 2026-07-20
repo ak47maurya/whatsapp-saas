@@ -114,6 +114,15 @@ socket.on('instance:disconnected', (data) => {
   if (data.instanceId === instanceId) onDisconnected(instanceId);
 });
 
+socket.on('instance:replaced', (data) => {
+  if (data.instanceId === instanceId) {
+    const box = document.getElementById('statusBox');
+    box.className = 'alert alert-warning d-inline-block px-4';
+    document.getElementById('statusText').textContent = 'Session Replaced';
+    document.getElementById('qrContainer').innerHTML = '<i class="fas fa-exclamation-triangle text-warning" style="font-size:5rem"></i><h5 class="mt-2 text-warning">Another WhatsApp Web session is active</h5><p class="text-muted mt-2" style="max-width:400px;margin:auto">Go to WhatsApp → Settings → Linked Devices → remove all devices. Then wait 15 minutes and come back to this page.</p>';
+  }
+});
+
 // QR countdown & auto-refresh
 let countdown = 60;
 setInterval(() => {

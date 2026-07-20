@@ -175,14 +175,18 @@ class WhatsAppInstance {
             }
 
             if (isReplaced) {
+              const authPath = path.join(config.rootDir, config.baileys.authDir, this.strId);
+              try { await fs.rm(authPath, { recursive: true, force: true }); } catch {}
               instance.status = 'disconnected';
+              instance.authData = { creds: null, keys: null };
               instance.lastDisconnected = new Date();
               await instance.save();
               this.sock = null;
               const io = getIO();
               if (io) {
-                io.to(`user:${instance.user}`).emit('instance:disconnected', {
-                  instanceId: this.strId, reason: 'connection_replaced',
+                io.to(`user:${instance.user}`).emit('instance:replaced', {
+                  instanceId: this.strId,
+                  message: 'Another WhatsApp Web session is active on your phone. Please go to WhatsApp → Settings → Linked Devices → remove all devices, then wait 15 minutes and try again.',
                 });
               }
               await triggerWebhook(instance.user, instance._id, 'instance.disconnected', {
@@ -190,7 +194,7 @@ class WhatsAppInstance {
               });
               const redis = getRedisClient();
               await redis.del(this.redisKey);
-              logger.info(`Instance ${this.strId} connection replaced — no auto-reconnect`);
+              logger.info(`Instance ${this.strId} connection replaced — auth cleared, user notified`);
               done(new Error('Connection replaced by another session'));
               return;
             }

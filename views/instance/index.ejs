@@ -24,7 +24,8 @@
                 <div class="d-flex justify-content-between align-items-start mb-2">
                   <h5 class="card-title mb-0"><%= inst.name %></h5>
                   <code class="small text-muted" style="font-size:11px"><%= inst._id %></code>
-                  <span class="badge bg-<%= inst.status === 'connected' ? 'success' : inst.status === 'qr_ready' ? 'info' : inst.status === 'connecting' ? 'warning' : 'secondary' %>"><%= inst.status %></span>
+                  <% const rs = inst._realStatus || inst.status; %>
+                  <span class="badge bg-<%= rs === 'connected' ? 'success' : rs === 'qr_ready' ? 'info' : rs === 'connecting' ? 'warning' : 'secondary' %>"><%= rs %></span>
                 </div>
                 <p class="card-text small text-muted"><i class="fas fa-phone me-1"></i><%= inst.phone || 'Not connected' %></p>
                 <p class="card-text small text-muted"><i class="fas fa-clock me-1"></i><%= inst.lastConnected ? new Date(inst.lastConnected).toLocaleString() : 'Never connected' %></p>
@@ -34,17 +35,18 @@
                   <%= d?.type === 'random' ? (d?.minDelay||1000)+'–'+(d?.maxDelay||5000)+'ms (random)' : (d?.fixedDelay||2000)+'ms (fixed)' %>
                 </div>
                 <div class="mt-3 d-flex gap-1 flex-wrap">
-                  <% if (inst.status === 'disconnected' || inst.status === 'error') { %>
+                  <% if (rs === 'disconnected' || rs === 'error') { %>
                     <a href="/instances/<%= inst._id %>/connect" class="btn btn-sm btn-success"><i class="fas fa-qrcode"></i> Connect QR</a>
                   <% } %>
-                  <% if (inst.status === 'connecting') { %>
+                  <% if (rs === 'connecting') { %>
                     <button onclick="retryConnection('<%= inst._id %>')" class="btn btn-sm btn-warning"><i class="fas fa-sync"></i> Retry Connection</button>
                   <% } %>
-                  <% if (inst.status === 'qr_ready') { %>
+                  <% if (rs === 'qr_ready') { %>
                     <a href="/instances/<%= inst._id %>/connect" class="btn btn-sm btn-info"><i class="fas fa-qrcode"></i> Show QR</a>
                   <% } %>
-                  <% if (inst.status === 'connected') { %>
+                  <% if (rs === 'connected') { %>
                     <span class="badge bg-success p-2"><i class="fas fa-check-circle"></i> Connected</span>
+                    <button onclick="retryConnection('<%= inst._id %>')" class="btn btn-sm btn-warning"><i class="fas fa-sync"></i> Restart</button>
                     <button onclick="logoutInstance('<%= inst._id %>')" class="btn btn-sm btn-danger"><i class="fas fa-sign-out-alt"></i> Logout</button>
                   <% } %>
                   <button onclick="openDelayConfig('<%= inst._id %>')" class="btn btn-sm btn-outline-secondary" title="Message Delay"><i class="fas fa-clock"></i></button>
@@ -115,6 +117,13 @@ const socket = io({ auth: { token: '<%= token || "" %>' } });
 socket.on('instance:qr', (data) => { if(data.qr) Swal.fire({ title:'Scan QR', imageUrl: data.qr, imageWidth:300, text:'Scan with WhatsApp → Linked Devices' }); });
 socket.on('instance:connected', () => { location.reload(); });
 socket.on('instance:disconnected', () => { location.reload(); });
+socket.on('instance:replaced', (data) => {
+  Swal.fire({
+    icon: 'warning',
+    title: 'Session Replaced',
+    html: '<p>Another WhatsApp Web session is active on your phone.</p><p class="text-muted small">Go to <strong>WhatsApp → Settings → Linked Devices → remove all devices</strong>. Then wait 15 minutes and try again.</p>',
+  }).then(() => location.reload());
+});
 
 function retryConnection(id) {
   Swal.fire({ title:'Reconnecting...', text:'Please wait while we try to reconnect', allowOutsideClick:false, didOpen:()=>Swal.showLoading() });
