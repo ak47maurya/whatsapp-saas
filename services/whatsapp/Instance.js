@@ -158,6 +158,7 @@ class WhatsAppInstance {
             const isLoggedOut = lastDisconnect?.error instanceof Boom
               && lastDisconnect.error?.output?.statusCode === DisconnectReason.loggedOut;
             const isReplaced = reasonCode === DisconnectReason.connectionReplaced;
+            const isRestartRequired = reasonCode === DisconnectReason.restartRequired;
 
             if (isLoggedOut) {
               instance.status = 'disconnected';
@@ -196,6 +197,20 @@ class WhatsAppInstance {
               await redis.del(this.redisKey);
               logger.info(`Instance ${this.strId} connection replaced — auth cleared, user notified`);
               done(new Error('Connection replaced by another session'));
+              return;
+            }
+
+            if (isRestartRequired) {
+              logger.info(`Instance ${this.strId} restartRequired — reconnecting immediately`);
+              this.sock = null;
+              const delay = 3000;
+              this._reconnectTimer = setTimeout(() => {
+                this._reconnectTimer = null;
+                this.init(false).catch(err => {
+                  logger.error(`Reconnect failed for ${this.strId}: ${err.message}`);
+                });
+              }, delay);
+              done(new Error('Restart required'));
               return;
             }
 
