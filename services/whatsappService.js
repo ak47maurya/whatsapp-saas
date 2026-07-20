@@ -61,27 +61,7 @@ export const getSocket = (instanceId) => {
 export const ensureSocket = async (instanceId) => {
   const instance = getManagedInstance(instanceId);
   if (instance?.sock) return instance.sock;
-
-  const instDoc = await Instance.findById(instanceId).select('status');
-  if (!instDoc || instDoc.status !== 'connected') return null;
-
-  const authPath = getAuthPath(instanceId);
-  try {
-    await fs.access(authPath);
-  } catch {
-    await Instance.findByIdAndUpdate(instanceId, { status: 'disconnected', lastDisconnected: new Date() });
-    return null;
-  }
-
-  logger.info(`ensureSocket: instance ${instanceId} connected in DB but not in memory, reconnecting...`);
-  try {
-    const inst = createInstance(instanceId);
-    await inst.init(false);
-    return inst.sock;
-  } catch (err) {
-    logger.error(`ensureSocket failed for ${instanceId}: ${err.message}`);
-    return null;
-  }
+  return null;
 };
 
 export const resetStaleConnections = async () => {
@@ -114,22 +94,7 @@ export const sendMessage = async (instanceId, to, content, type = 'text') => {
   let instance = getManagedInstance(instanceId);
 
   if (!instance || !instance.sock) {
-    const authPath = getAuthPath(instanceId);
-    try {
-      await fs.access(authPath);
-    } catch {
-      await Instance.findByIdAndUpdate(instanceId, { status: 'disconnected', lastDisconnected: new Date() });
-      throw new Error('Instance not connected. Reconnect manually from the web app.');
-    }
-
-    logger.info(`sendMessage: instance ${instanceId} socket dead, attempting reconnect...`);
-    instance = createInstance(instanceId);
-    try {
-      await instance.init(false);
-    } catch (err) {
-      await Instance.findByIdAndUpdate(instanceId, { status: 'disconnected', lastDisconnected: new Date() });
-      throw new Error(`Instance not connected. Reconnect failed: ${err.message}`);
-    }
+    throw new Error('Instance not connected. Reconnect manually from the web app.');
   }
 
   return instance.sendMessage(to, content, type);

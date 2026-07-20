@@ -413,25 +413,7 @@ class WhatsAppInstance {
 
   async sendMessage(to, content, type = 'text') {
     if (!this.sock) {
-      if (this._reconnectTimer) {
-        clearTimeout(this._reconnectTimer);
-        this._reconnectTimer = null;
-      }
-
-      try {
-        await fs.access(this.authPath);
-      } catch {
-        await Instance.findByIdAndUpdate(this.instanceId, { status: 'disconnected', lastDisconnected: new Date() });
-        throw new Error('Instance disconnected — reconnect manually');
-      }
-
-      logger.info(`sendMessage: instance ${this.strId} socket dead, attempting reconnect...`);
-      try {
-        await this.init(false);
-      } catch (err) {
-        await Instance.findByIdAndUpdate(this.instanceId, { status: 'disconnected', lastDisconnected: new Date() });
-        throw new Error(`Instance not connected. Reconnect failed: ${err.message}`);
-      }
+      throw new Error('Instance not connected. Reconnect manually from the web app.');
     }
 
     const jid = to.includes('@') ? to : `${to}@s.whatsapp.net`;
