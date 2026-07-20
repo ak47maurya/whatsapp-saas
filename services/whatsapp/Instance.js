@@ -53,12 +53,13 @@ class WhatsAppInstance {
     }
     this._initLock = true;
     this._settled = false;
+    let initTimeout = null;
 
     return new Promise(async (resolve, reject) => {
       const done = (err, val) => {
         if (this._settled) return;
         this._settled = true;
-        clearTimeout(timeout);
+        if (initTimeout) clearTimeout(initTimeout);
         if (err) reject(err);
         else resolve(val);
       };
@@ -100,7 +101,7 @@ class WhatsAppInstance {
 
         this.sock.ev.on('creds.update', saveCreds);
 
-        const timeout = setTimeout(() => {
+        initTimeout = setTimeout(() => {
           this._initLock = false;
           done(new Error('Connection timed out after 30s'));
         }, 30000);
