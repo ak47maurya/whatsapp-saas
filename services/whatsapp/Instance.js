@@ -33,6 +33,7 @@ class WhatsAppInstance {
     this.saveCreds = null;
     this.connectedSince = null;
     this._initLock = false;
+    this._settled = false;
     this._disconnectTimestamps = [];
     this._reconnectTimer = null;
     this._sockGen = 0;
@@ -51,8 +52,16 @@ class WhatsAppInstance {
       throw new Error('Connection already in progress');
     }
     this._initLock = true;
+    this._settled = false;
 
     return new Promise(async (resolve, reject) => {
+      const done = (err, val) => {
+        if (this._settled) return;
+        this._settled = true;
+        clearTimeout(timeout);
+        if (err) reject(err);
+        else resolve(val);
+      };
       try {
         const instance = await Instance.findById(this.instanceId);
         if (!instance) throw new Error('Instance not found');
@@ -93,7 +102,7 @@ class WhatsAppInstance {
 
         const timeout = setTimeout(() => {
           this._initLock = false;
-          reject(new Error('Connection timed out after 30s'));
+          done(new Error('Connection timed out after 30s'));
         }, 30000);
 
         this.sock.ev.on('connection.update', async (update) => {
@@ -122,7 +131,7 @@ class WhatsAppInstance {
 
             await triggerWebhook(instance.user, instance._id, 'instance.qr', { instanceId: this.strId });
             this._initLock = false;
-            resolve({ status: 'qr_ready', qr: qrBase64 });
+            done(null, { status: 'qr_ready', qr: qrBase64 });
           }
 
           if (connection === 'open') {
@@ -130,7 +139,7 @@ class WhatsAppInstance {
             this.connectedSince = Date.now();
             await this._onConnected(instance);
             this._initLock = false;
-            resolve({ status: 'connected' });
+            done(null, { status: 'connected' });
           }
 
           if (connection === 'close') {
@@ -161,7 +170,7 @@ class WhatsAppInstance {
                   instanceId: this.strId, reason: 'logged_out',
                 });
               }
-              reject(new Error('Logged out'));
+              done(new Error('Logged out'));
               return;
             }
 
@@ -183,7 +192,7 @@ class WhatsAppInstance {
               const redis = getRedisClient();
               await redis.del(this.redisKey);
               logger.info(`Instance ${this.strId} connection replaced — auth cleared, no auto-reconnect`);
-              reject(new Error('Connection replaced by another session'));
+              done(new Error('Connection replaced by another session'));
               return;
             }
 
@@ -216,7 +225,7 @@ class WhatsAppInstance {
               await instance.save();
               logger.info(`Instance ${this.strId} flapping — stopped after ${this._disconnectTimestamps.length} disconnects in 60s`);
               this._disconnectTimestamps = [];
-              reject(new Error(`Connection unstable (${reasonMsg}). Retry manually.`));
+              done(new Error(`Connection unstable (${reasonMsg}). Retry manually.`));
               return;
             }
 
@@ -230,7 +239,7 @@ class WhatsAppInstance {
                 });
               }, delay);
             }
-            reject(new Error(`Connection closed: ${reasonMsg}`));
+            done(new Error(`Connection closed: ${reasonMsg}`));
           }
         });
 
@@ -245,7 +254,7 @@ class WhatsAppInstance {
         });
       } catch (err) {
         this._initLock = false;
-        reject(err);
+        done(err);
       }
     });
   }
