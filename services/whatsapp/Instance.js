@@ -164,7 +164,6 @@ class WhatsAppInstance {
               instance.lastDisconnected = new Date();
               await instance.save();
               this.sock = null;
-              try { await fs.rm(this.authPath, { recursive: true, force: true }); } catch {}
               const io = getIO();
               if (io) {
                 io.to(`user:${instance.user}`).emit('instance:disconnected', {
@@ -180,7 +179,6 @@ class WhatsAppInstance {
               instance.lastDisconnected = new Date();
               await instance.save();
               this.sock = null;
-              try { await fs.rm(this.authPath, { recursive: true, force: true }); } catch {}
               const io = getIO();
               if (io) {
                 io.to(`user:${instance.user}`).emit('instance:disconnected', {
@@ -192,7 +190,7 @@ class WhatsAppInstance {
               });
               const redis = getRedisClient();
               await redis.del(this.redisKey);
-              logger.info(`Instance ${this.strId} connection replaced — auth cleared, no auto-reconnect`);
+              logger.info(`Instance ${this.strId} connection replaced — no auto-reconnect`);
               done(new Error('Connection replaced by another session'));
               return;
             }
