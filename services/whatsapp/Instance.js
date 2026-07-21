@@ -164,9 +164,13 @@ class WhatsAppInstance {
                 return;
               }
 
-              // restartRequired is normal after QR scan — Baileys reconnects internally
+              // restartRequired: normal after QR scan — socket is destroyed (ev removed, ev.destroy())
+              // New creds already saved via creds.update. Reconnect immediately.
               if (isRestart) {
-                logger.info(`Instance ${this.strId} restartRequired — Baileys will reconnect with new auth`);
+                logger.info(`Instance ${this.strId} restartRequired — reconnecting immediately with new auth`);
+                this.init(false).catch(err => {
+                  logger.error(`Reconnect after restartRequired failed for ${this.strId}: ${err.message}`);
+                });
                 return;
               }
 
