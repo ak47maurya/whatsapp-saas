@@ -47,9 +47,7 @@ class WhatsAppInstance {
   }
 
   async init(forQR = false) {
-    if (this._initPromise && forQR) return this._initPromise;
-
-    this._initPromise = new Promise(async (resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       try {
         const instance = await Instance.findById(this.instanceId);
         if (!instance) throw new Error('Instance not found');
@@ -276,8 +274,6 @@ class WhatsAppInstance {
         reject(err);
       }
     });
-
-    return forQR ? this._initPromise : this;
   }
 
   async _onConnected(instance) {
