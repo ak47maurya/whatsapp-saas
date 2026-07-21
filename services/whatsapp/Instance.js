@@ -165,8 +165,6 @@ class WhatsAppInstance {
               }
 
               if (isReplaced) {
-                const authPath = path.join(config.rootDir, config.baileys.authDir, this.strId);
-                try { await fs.rm(authPath, { recursive: true, force: true }); } catch {}
                 instance.status = 'disconnected';
                 instance.authData = { creds: null, keys: null };
                 instance.lastDisconnected = new Date();
@@ -184,7 +182,7 @@ class WhatsAppInstance {
                 });
                 const redis = getRedisClient();
                 await redis.del(this.redisKey);
-                logger.info(`Instance ${this.strId} connection replaced — auth cleared, user notified`);
+                logger.info(`Instance ${this.strId} connection replaced — auth invalidated, user notified`);
                 reject(new Error('Connection replaced by another session'));
                 return;
               }
