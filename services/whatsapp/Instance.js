@@ -165,9 +165,10 @@ class WhatsAppInstance {
               }
 
               // restartRequired: normal after QR scan — socket is destroyed (ev removed, ev.destroy())
-              // New creds already saved via creds.update. Reconnect immediately.
+              // New creds already saved via creds.update. Reset _initializing and reconnect.
               if (isRestart) {
                 logger.info(`Instance ${this.strId} restartRequired — reconnecting immediately with new auth`);
+                this._initializing = false;
                 this.init(false).catch(err => {
                   logger.error(`Reconnect after restartRequired failed for ${this.strId}: ${err.message}`);
                 });
