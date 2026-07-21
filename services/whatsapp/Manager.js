@@ -30,7 +30,7 @@ export const startHealthCheck = () => {
   setInterval(() => {
     for (const [strId, inst] of instances.entries()) {
       try {
-        if (inst._initLock || inst._reconnectTimer) continue;
+        if (inst._reconnectTimer || inst._initPromise) continue;
         if (inst.sock && inst.sock.ws?.readyState !== 1) {
           logger.warn(`Health check: instance ${strId} socket dead, removing`);
           instances.delete(strId);

@@ -32,11 +32,10 @@ class WhatsAppInstance {
     this.authState = null;
     this.saveCreds = null;
     this.connectedSince = null;
-    this._initLock = false;
-    this._settled = false;
     this._disconnectTimestamps = [];
     this._reconnectTimer = null;
-    this._sockGen = 0;
+    this._manualDisconnect = false;
+    this._initPromise = null;
   }
 
   get authPath() {
@@ -48,21 +47,9 @@ class WhatsAppInstance {
   }
 
   async init(forQR = false) {
-    if (this._initLock) {
-      throw new Error('Connection already in progress');
-    }
-    this._initLock = true;
-    this._settled = false;
-    let initTimeout = null;
+    if (this._initPromise && forQR) return this._initPromise;
 
-    return new Promise(async (resolve, reject) => {
-      const done = (err, val) => {
-        if (this._settled) return;
-        this._settled = true;
-        if (initTimeout) clearTimeout(initTimeout);
-        if (err) reject(err);
-        else resolve(val);
-      };
+    this._initPromise = new Promise(async (resolve, reject) => {
       try {
         const instance = await Instance.findById(this.instanceId);
         if (!instance) throw new Error('Instance not found');
@@ -81,9 +68,7 @@ class WhatsAppInstance {
           await new Promise(r => setTimeout(r, 2000));
         }
 
-        const gen = ++this._sockGen;
-
-        this.sock = makeWASocket({
+        const sock = makeWASocket({
           version,
           browser: Browsers.windows('Chrome'),
           auth: this.authState,
@@ -94,205 +79,207 @@ class WhatsAppInstance {
           generateHighQualityLink: true,
           shouldReconnect: () => false,
         });
+        this.sock = sock;
 
         instance.status = 'connecting';
         instance.qrCode = forQR ? { attempts: (instance.qrCode?.attempts || 0) + 1 } : undefined;
         await instance.save();
 
-        this.sock.ev.on('creds.update', saveCreds);
+        let settled = false;
+        const timeout = forQR ? setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          reject(new Error('Connection timed out after 30s'));
+        }, 30000) : null;
 
-        initTimeout = setTimeout(() => {
-          this._initLock = false;
-          done(new Error('Connection timed out after 30s'));
-        }, 30000);
+        sock.ev.on('creds.update', saveCreds);
 
-        this.sock.ev.on('connection.update', async (update) => {
-          if (gen !== this._sockGen) return;
+        sock.ev.on('connection.update', async (update) => {
+          if (sock !== this.sock || settled) return;
           try {
-          const { connection, lastDisconnect, qr } = update;
+            const { connection, lastDisconnect, qr } = update;
 
-          if (qr && forQR) {
-            clearTimeout(initTimeout);
-            const qrBase64 = await qrcode.toDataURL(qr);
-            instance.qrCode = {
-              code: qrBase64,
-              generatedAt: new Date(),
-              expiresAt: new Date(Date.now() + 60000),
-              attempts: instance.qrCode?.attempts || 0,
-            };
-            instance.status = 'qr_ready';
-            await instance.save();
-
-            const io = getIO();
-            if (io) {
-              io.to(`user:${instance.user}`).emit('instance:qr', {
-                instanceId: this.strId, qr: qrBase64, attempts: instance.qrCode.attempts,
-              });
-            }
-
-            await triggerWebhook(instance.user, instance._id, 'instance.qr', { instanceId: this.strId });
-            this._initLock = false;
-            done(null, { status: 'qr_ready', qr: qrBase64 });
-          }
-
-          if (connection === 'open') {
-            clearTimeout(initTimeout);
-            this.connectedSince = Date.now();
-            await this._onConnected(instance);
-            this._initLock = false;
-            done(null, { status: 'connected' });
-          }
-
-          if (connection === 'close') {
-            clearTimeout(initTimeout);
-            this._initLock = false;
-
-            const reasonCode = lastDisconnect?.error instanceof Boom
-              ? (lastDisconnect.error?.output?.statusCode || 'unknown') : 'unknown';
-            const reasonMsg = lastDisconnect?.error instanceof Boom
-              ? (DisconnectReason[reasonCode] || `Code ${reasonCode}`)
-              : (lastDisconnect?.error?.message || 'Unknown');
-
-            logger.info(`Instance ${this.strId} disconnected — reason: ${reasonMsg}`);
-
-            const isLoggedOut = lastDisconnect?.error instanceof Boom
-              && lastDisconnect.error?.output?.statusCode === DisconnectReason.loggedOut;
-            const isReplaced = reasonCode === DisconnectReason.connectionReplaced;
-            const isRestartRequired = reasonCode === DisconnectReason.restartRequired;
-
-            if (isLoggedOut) {
-              instance.status = 'disconnected';
-              instance.lastDisconnected = new Date();
+            if (qr && forQR) {
+              settled = true;
+              if (timeout) clearTimeout(timeout);
+              const qrBase64 = await qrcode.toDataURL(qr);
+              instance.qrCode = {
+                code: qrBase64,
+                generatedAt: new Date(),
+                expiresAt: new Date(Date.now() + 60000),
+                attempts: instance.qrCode?.attempts || 0,
+              };
+              instance.status = 'qr_ready';
               await instance.save();
-              this.sock = null;
+
               const io = getIO();
               if (io) {
-                io.to(`user:${instance.user}`).emit('instance:disconnected', {
-                  instanceId: this.strId, reason: 'logged_out',
+                io.to(`user:${instance.user}`).emit('instance:qr', {
+                  instanceId: this.strId, qr: qrBase64, attempts: instance.qrCode.attempts,
                 });
               }
-              done(new Error('Logged out'));
+
+              await triggerWebhook(instance.user, instance._id, 'instance.qr', { instanceId: this.strId });
+              resolve({ status: 'qr_ready', qr: qrBase64 });
               return;
             }
 
-            if (isReplaced) {
-              const authPath = path.join(config.rootDir, config.baileys.authDir, this.strId);
-              try { await fs.rm(authPath, { recursive: true, force: true }); } catch {}
-              instance.status = 'disconnected';
-              instance.authData = { creds: null, keys: null };
-              instance.lastDisconnected = new Date();
-              await instance.save();
-              this.sock = null;
-              const io = getIO();
-              if (io) {
-                io.to(`user:${instance.user}`).emit('instance:replaced', {
-                  instanceId: this.strId,
-                  message: 'Another WhatsApp Web session is active on your phone. Please go to WhatsApp → Settings → Linked Devices → remove all devices, then wait 15 minutes and try again.',
-                });
+            if (connection === 'open') {
+              settled = true;
+              if (timeout) clearTimeout(timeout);
+              this.connectedSince = Date.now();
+              await this._onConnected(instance);
+              resolve({ status: 'connected' });
+              return;
+            }
+
+            if (connection === 'close') {
+              settled = true;
+              if (timeout) clearTimeout(timeout);
+
+              const reasonCode = lastDisconnect?.error instanceof Boom
+                ? (lastDisconnect.error?.output?.statusCode || 'unknown') : 'unknown';
+              const reasonMsg = lastDisconnect?.error instanceof Boom
+                ? (DisconnectReason[reasonCode] || `Code ${reasonCode}`)
+                : (lastDisconnect?.error?.message || 'Unknown');
+
+              logger.info(`Instance ${this.strId} disconnected — reason: ${reasonMsg}`);
+
+              const isLoggedOut = lastDisconnect?.error instanceof Boom
+                && lastDisconnect.error?.output?.statusCode === DisconnectReason.loggedOut;
+              const isReplaced = reasonCode === DisconnectReason.connectionReplaced;
+
+              if (isLoggedOut) {
+                instance.status = 'disconnected';
+                instance.lastDisconnected = new Date();
+                await instance.save();
+                this.sock = null;
+                const io = getIO();
+                if (io) {
+                  io.to(`user:${instance.user}`).emit('instance:disconnected', {
+                    instanceId: this.strId, reason: 'logged_out',
+                  });
+                }
+                reject(new Error('Logged out'));
+                return;
               }
-              await triggerWebhook(instance.user, instance._id, 'instance.disconnected', {
-                instanceId: this.strId, reason: 'connection_replaced',
-              });
+
+              if (isReplaced) {
+                const authPath = path.join(config.rootDir, config.baileys.authDir, this.strId);
+                try { await fs.rm(authPath, { recursive: true, force: true }); } catch {}
+                instance.status = 'disconnected';
+                instance.authData = { creds: null, keys: null };
+                instance.lastDisconnected = new Date();
+                await instance.save();
+                this.sock = null;
+                const io = getIO();
+                if (io) {
+                  io.to(`user:${instance.user}`).emit('instance:replaced', {
+                    instanceId: this.strId,
+                    message: 'Another WhatsApp Web session is active on your phone. Please go to WhatsApp → Settings → Linked Devices → remove all devices, then wait 15 minutes and try again.',
+                  });
+                }
+                await triggerWebhook(instance.user, instance._id, 'instance.disconnected', {
+                  instanceId: this.strId, reason: 'connection_replaced',
+                });
+                const redis = getRedisClient();
+                await redis.del(this.redisKey);
+                logger.info(`Instance ${this.strId} connection replaced — auth cleared, user notified`);
+                reject(new Error('Connection replaced by another session'));
+                return;
+              }
+
+              if (this._manualDisconnect) {
+                this._manualDisconnect = false;
+                instance.status = 'disconnected';
+                instance.lastDisconnected = new Date();
+                await instance.save();
+                this.sock = null;
+                const io = getIO();
+                if (io) {
+                  io.to(`user:${instance.user}`).emit('instance:disconnected', {
+                    instanceId: this.strId, reason: 'manual',
+                  });
+                }
+                reject(new Error('Manual disconnect'));
+                return;
+              }
+
+              this.sock = null;
               const redis = getRedisClient();
               await redis.del(this.redisKey);
-              logger.info(`Instance ${this.strId} connection replaced — auth cleared, user notified`);
-              done(new Error('Connection replaced by another session'));
-              return;
-            }
 
-            if (isRestartRequired) {
-              ++this._sockGen;
-              this._initLock = false;
-              logger.info(`Instance ${this.strId} restartRequired — reconnecting`);
-              this.sock = null;
-              const io2 = getIO();
-              if (io2) {
-                io2.to(`user:${instance.user}`).emit('instance:reconnecting', {
-                  instanceId: this.strId, reason: 'restart_required',
-                });
+              const now = Date.now();
+              this._disconnectTimestamps.push(now);
+              this._disconnectTimestamps = this._disconnectTimestamps.filter(t => now - t < 60000);
+
+              if (this._disconnectTimestamps.length > 5) {
+                instance.status = 'error';
+                instance.lastDisconnected = new Date();
+                await instance.save();
+                logger.info(`Instance ${this.strId} flapping — stopped after ${this._disconnectTimestamps.length} disconnects in 60s`);
+                this._disconnectTimestamps = [];
+                const io = getIO();
+                if (io) {
+                  io.to(`user:${instance.user}`).emit('instance:disconnected', {
+                    instanceId: this.strId, reason: 'flapping_' + reasonMsg,
+                  });
+                }
+                reject(new Error(`Connection unstable (${reasonMsg}). Retry manually.`));
+                return;
               }
-              const delay = 1000;
-              this._reconnectTimer = setTimeout(() => {
-                this._reconnectTimer = null;
-                this.init(false).catch(err => {
-                  logger.error(`Reconnect failed for ${this.strId}: ${err.message}`);
-                });
-              }, delay);
-              done(new Error('Restart required'));
-              return;
-            }
 
-            this.sock = null;
-            const redis = getRedisClient();
-            await redis.del(this.redisKey);
-
-            const now = Date.now();
-            this._disconnectTimestamps.push(now);
-            this._disconnectTimestamps = this._disconnectTimestamps.filter(t => now - t < 60000);
-
-            // Auto-reconnect immediately — don't show 'disconnected' yet
-            if (instance.settings?.autoReconnect !== false && this._disconnectTimestamps.length <= 5) {
-              const delay = this._disconnectTimestamps.length <= 1 ? 500 : 3000;
-              logger.info(`Instance ${this.strId} reconnecting in ${delay}ms... (reason: ${reasonMsg})`);
-              // Emit 'reconnecting' so frontend shows waiting state instead of disconnected
-              const io2 = getIO();
-              if (io2) {
-                io2.to(`user:${instance.user}`).emit('instance:reconnecting', {
+              if (instance.settings?.autoReconnect !== false) {
+                const delay = 5000;
+                logger.info(`Instance ${this.strId} reconnecting in ${delay}ms...`);
+                const io = getIO();
+                if (io) {
+                  io.to(`user:${instance.user}`).emit('instance:reconnecting', {
+                    instanceId: this.strId, reason: reasonMsg,
+                  });
+                }
+                setTimeout(() => {
+                  this.init(false).catch(err => {
+                    logger.error(`Reconnect failed for ${this.strId}: ${err.message}`);
+                  });
+                }, delay);
+              } else {
+                instance.status = 'disconnected';
+                instance.lastDisconnected = new Date();
+                await instance.save();
+                const io = getIO();
+                if (io) {
+                  io.to(`user:${instance.user}`).emit('instance:disconnected', {
+                    instanceId: this.strId, reason: reasonMsg,
+                  });
+                }
+                await triggerWebhook(instance.user, instance._id, 'instance.disconnected', {
                   instanceId: this.strId, reason: reasonMsg,
                 });
               }
-              this._reconnectTimer = setTimeout(() => {
-                this._reconnectTimer = null;
-                this.init(false).catch(err => {
-                  logger.error(`Reconnect failed for ${this.strId}: ${err.message}`);
-                });
-              }, delay);
-              done(new Error(`Connection closed: ${reasonMsg}`));
-              return;
+
+              reject(new Error(`Connection closed: ${reasonMsg}`));
             }
-
-            // No auto-reconnect or flapping detected — mark truly disconnected
-            instance.status = this._disconnectTimestamps.length > 5 ? 'error' : 'disconnected';
-            instance.lastDisconnected = new Date();
-            await instance.save();
-
-            const io3 = getIO();
-            if (io3) {
-              io3.to(`user:${instance.user}`).emit('instance:disconnected', {
-                instanceId: this.strId, reason: reasonMsg,
-              });
-            }
-
-            await triggerWebhook(instance.user, instance._id, 'instance.disconnected', {
-              instanceId: this.strId, reason: reasonMsg,
-            });
-
-            if (this._disconnectTimestamps.length > 5) {
-              logger.info(`Instance ${this.strId} flapping — stopped after ${this._disconnectTimestamps.length} disconnects in 60s`);
-              this._disconnectTimestamps = [];
-            }
-
-            done(new Error(`Connection closed: ${reasonMsg}`));
+          } catch (err) {
+            logger.error(`Connection update error for ${this.strId}: ${err.message}`);
           }
-        } catch (err) {
-          logger.error(`Connection update error for ${this.strId}: ${err.message}`);
-        }
         });
 
-        this.sock.ev.on('messages.upsert', async (msgEvent) => {
-          if (gen !== this._sockGen) return;
+        sock.ev.on('messages.upsert', async (msgEvent) => {
+          if (sock !== this.sock) return;
           try { await this._handleMessages(msgEvent); } catch (err) { logger.error(`Message upsert error for ${this.strId}: ${err.message}`); }
         });
 
-        this.sock.ev.on('messages.update', async (updates) => {
-          if (gen !== this._sockGen) return;
+        sock.ev.on('messages.update', async (updates) => {
+          if (sock !== this.sock) return;
           try { await this._handleMessageUpdates(updates); } catch (err) { logger.error(`Message update error for ${this.strId}: ${err.message}`); }
         });
       } catch (err) {
-        this._initLock = false;
-        done(err);
+        reject(err);
       }
     });
+
+    return forQR ? this._initPromise : this;
   }
 
   async _onConnected(instance) {
@@ -526,6 +513,7 @@ class WhatsAppInstance {
   }
 
   async disconnect() {
+    this._manualDisconnect = true;
     if (this._reconnectTimer) {
       clearTimeout(this._reconnectTimer);
       this._reconnectTimer = null;
@@ -544,6 +532,7 @@ class WhatsAppInstance {
   }
 
   async logout() {
+    this._manualDisconnect = true;
     if (this._reconnectTimer) {
       clearTimeout(this._reconnectTimer);
       this._reconnectTimer = null;
