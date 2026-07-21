@@ -78,7 +78,6 @@ class WhatsAppInstance {
           markOnlineOnConnect: true,
           logger: baileysLogger,
           generateHighQualityLink: true,
-          shouldReconnect: () => false,
         });
         this.sock = sock;
 
@@ -101,7 +100,6 @@ class WhatsAppInstance {
             const { connection, lastDisconnect, qr } = update;
 
             if (qr && forQR) {
-              settled = true;
               if (timeout) clearTimeout(timeout);
               const qrBase64 = await qrcode.toDataURL(qr);
               instance.qrCode = {
@@ -126,8 +124,8 @@ class WhatsAppInstance {
             }
 
             if (connection === 'open') {
-              settled = true;
               if (timeout) clearTimeout(timeout);
+              settled = true;
               this.connectedSince = Date.now();
               await this._onConnected(instance);
               resolve({ status: 'connected' });
