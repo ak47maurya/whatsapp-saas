@@ -23,6 +23,9 @@ export const generateQR = async (instanceId) => {
     const mgr = getManagedInstance(instanceId);
     if (mgr && mgr.sock && mgr.sock.ws?.readyState === 1) return instDoc;
   }
+  const authPath = getAuthPath(instanceId);
+  try { await fs.rm(authPath, { recursive: true, force: true }); } catch {}
+  removeInstance(instanceId);
   const instance = createInstance(instanceId);
   await instance.init(true);
   return Instance.findById(instanceId);
