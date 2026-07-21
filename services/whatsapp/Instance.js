@@ -147,6 +147,28 @@ class WhatsAppInstance {
               const isLoggedOut = lastDisconnect?.error instanceof Boom
                 && lastDisconnect.error?.output?.statusCode === DisconnectReason.loggedOut;
               const isReplaced = reasonCode === DisconnectReason.connectionReplaced;
+              const isRestart = reasonCode === DisconnectReason.restartRequired;
+
+              if (isLoggedOut) {
+                instance.status = 'disconnected';
+                instance.lastDisconnected = new Date();
+                await instance.save();
+                this.sock = null;
+                const io = getIO();
+                if (io) {
+                  io.to(`user:${instance.user}`).emit('instance:disconnected', {
+                    instanceId: this.strId, reason: 'logged_out',
+                  });
+                }
+                reject(new Error('Logged out'));
+                return;
+              }
+
+              // restartRequired is normal after QR scan — Baileys reconnects internally
+              if (isRestart) {
+                logger.info(`Instance ${this.strId} restartRequired — Baileys will reconnect with new auth`);
+                return;
+              }
 
               if (isLoggedOut) {
                 instance.status = 'disconnected';
