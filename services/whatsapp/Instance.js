@@ -47,10 +47,13 @@ class WhatsAppInstance {
   }
 
   async init(forQR = false) {
-    return new Promise(async (resolve, reject) => {
+    if (this._initializing) return this;
+    this._initializing = true;
+
+    const promise = new Promise(async (resolve, reject) => {
       try {
         const instance = await Instance.findById(this.instanceId);
-        if (!instance) throw new Error('Instance not found');
+        if (!instance) { this._initializing = false; throw new Error('Instance not found'); }
 
         await fs.mkdir(this.authPath, { recursive: true });
 
@@ -225,6 +228,24 @@ class WhatsAppInstance {
                 return;
               }
 
+              // Don't auto-reconnect if init() is already running
+              if (this._initializing) {
+                instance.status = 'disconnected';
+                instance.lastDisconnected = new Date();
+                await instance.save();
+                const io = getIO();
+                if (io) {
+                  io.to(`user:${instance.user}`).emit('instance:disconnected', {
+                    instanceId: this.strId, reason: reasonMsg,
+                  });
+                }
+                await triggerWebhook(instance.user, instance._id, 'instance.disconnected', {
+                  instanceId: this.strId, reason: reasonMsg,
+                });
+                reject(new Error(`Connection closed: ${reasonMsg}`));
+                return;
+              }
+
               if (instance.settings?.autoReconnect !== false) {
                 const delay = 5000;
                 logger.info(`Instance ${this.strId} reconnecting in ${delay}ms...`);
@@ -274,6 +295,9 @@ class WhatsAppInstance {
         reject(err);
       }
     });
+
+    promise.finally(() => { this._initializing = false; }).catch(() => {});
+    return promise;
   }
 
   async _onConnected(instance) {
