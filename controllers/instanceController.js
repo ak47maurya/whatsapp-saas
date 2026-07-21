@@ -13,7 +13,7 @@ export const index = async (req, res) => {
       if (inst.status === 'connected') {
         const mgr = getInstance(inst._id);
         if (!mgr || !mgr.sock || mgr.sock.ws?.readyState !== 1) {
-          inst._realStatus = (mgr && (mgr._reconnectTimer || mgr._initializing)) ? 'reconnecting' : 'disconnected';
+          inst._realStatus = (mgr && mgr._reconnectTimer) ? 'reconnecting' : 'disconnected';
         } else {
           inst._realStatus = 'connected';
         }
